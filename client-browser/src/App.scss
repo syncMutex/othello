@@ -1,0 +1,17 @@
+@use "./scss/variables" as v;
+
+.header-main{
+  width: 100%;
+  height: 6rem;
+  display: flex;
+  align-items: center;
+  padding-left: 5%;
+  background-color: v.$color-green;
+  color: white;
+  position: relative;
+
+  .logo{
+    font-size: 2rem;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  }
+}
