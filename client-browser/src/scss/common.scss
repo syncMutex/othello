@@ -66,6 +66,7 @@ input[type=text]:focus ~ label, input[type=text]:valid ~ label{
 .flex-btns{
   display: flex;
   flex-direction: row;
+  align-items: center;
 
   > *{
     margin-right: 1rem;
