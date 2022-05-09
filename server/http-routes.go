@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -55,6 +56,23 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 	go gamesMap.gameSelfDestructOnIdle(gameId, time.Duration(time.Second*20))
 }
 
+func joinGame(w http.ResponseWriter, r *http.Request) {
+	s, err := newSocket(w, r)
+	if err != nil {
+		respondErrMsg(err.Error(), w)
+		return
+	}
+	s.on("test", func(data string) {
+		fmt.Println(data)
+	})
+	s.on("some msg", func(data string) {
+		fmt.Println("inside some msg")
+		s.emit("hehehe", "nonon")
+	})
+	fmt.Println(s.listen().Error())
+	s.conn.Close()
+}
+
 func createHttpRoutes() http.Handler {
 	headersOk := handlers.AllowedHeaders([]string{"Content-Type"})
 	originsOk := handlers.AllowedOrigins([]string{"*"})
@@ -63,5 +81,6 @@ func createHttpRoutes() http.Handler {
 
 	r := mainRouter.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/create-lobby", createLobby).Methods(http.MethodPost)
+	r.HandleFunc("/join-game", joinGame)
 	return handlers.CORS(headersOk, originsOk, methodsOk)(mainRouter)
 }
