@@ -1,6 +1,6 @@
 import "./create-game.scss"
 import { useUserName } from "../hooks/user-name"
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 type Side = "black" | "white";
@@ -8,6 +8,18 @@ type Side = "black" | "white";
 export default function CreateGame() { 
   const [userName] = useUserName();
   const [curSide, setCurSide] = useState<Side>("black")
+
+  const createLobby = async () => {
+    const res = await fetch("http://localhost:5000/api/create-lobby", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hostSide: curSide,
+        hostName: userName
+      })
+    })
+    const data = await res.json();
+  }
 
   return (<div className="create-game-page">
     <h1>Create Game</h1>
@@ -28,7 +40,7 @@ export default function CreateGame() {
       </div>
       <div className="flex-btns">
         <Link to="/home" className="btn-nobg link-btn" data-theme="dark">back</Link>
-        <button className="btn-green">create</button>
+        <button className="btn-green" onClick={createLobby}>create</button>
       </div>
     </div>
   </div>)
