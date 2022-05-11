@@ -1,18 +1,17 @@
 export class Socket{
-  private url:string;
   private conn:WebSocket|null = null;
   private eventMap:{
     [k:string]: (_:any) => void
   } = {};
   private queuedEmitsBeforeConn:{evName:string,data:any}[] = [];
 
-  constructor(url:string) {
-    this.url = url;
+  onClose(cb:() => void) {
+    this.conn?.addEventListener("close", cb)
   }
 
-  async connect() {
-    this.conn = new WebSocket(this.url);
-    this.conn?.addEventListener("message", (e:MessageEvent) => {
+  async connect(url:string) {
+    this.conn = new WebSocket(url);
+    this.conn.addEventListener("message", (e:MessageEvent) => {
       const msg:{ name:string, data:string } = JSON.parse(e.data);
       if(!(msg.name in this.eventMap)) return; 
       try{
@@ -33,6 +32,10 @@ export class Socket{
 
   private queueEmitBeforeConn(evName:string, data:any="") {
     this.queuedEmitsBeforeConn.push({ evName, data });
+  }
+
+  get isConnected() {
+    return this.conn && (this.conn.readyState === this.conn.OPEN);
   }
 
   on(evName:string, cb:(_:any) => void) {

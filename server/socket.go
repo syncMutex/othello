@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -17,11 +18,13 @@ var upgrader = websocket.Upgrader{
 }
 
 type socket struct {
-	w        http.ResponseWriter
-	r        *http.Request
-	conn     *websocket.Conn
-	isAuth   bool
-	eventMap map[string]func(string)
+	w          http.ResponseWriter
+	r          *http.Request
+	conn       *websocket.Conn
+	ctx        context.Context
+	isAuth     bool
+	eventMap   map[string]func([]byte)
+	onceEvents map[string]struct{}
 }
 
 type socketMsg struct {
@@ -34,12 +37,28 @@ func newSocket(w http.ResponseWriter, r *http.Request) (*socket, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &socket{w: w, r: r, conn: conn, eventMap: make(map[string]func(string))}
+	s := &socket{
+		w:          w,
+		r:          r,
+		conn:       conn,
+		eventMap:   make(map[string]func([]byte)),
+		onceEvents: make(map[string]struct{}),
+		ctx:        context.Background(),
+	}
 	return s, nil
 }
 
-func (s *socket) on(evName string, f func(string)) {
+func (s *socket) on(evName string, f func([]byte)) {
 	s.eventMap[evName] = f
+}
+
+func (s *socket) once(evName string, f func([]byte)) {
+	s.onceEvents[evName] = struct{}{}
+	s.on(evName, f)
+}
+
+func (s *socket) close() {
+	s.conn.Close()
 }
 
 func (s *socket) emit(evName string, data string) {
@@ -61,7 +80,11 @@ func (s *socket) listen() error {
 			return err
 		}
 		if f, ok := s.eventMap[msg.Name]; ok {
-			f(msg.Data)
+			f([]byte(msg.Data))
+			if _, ok = s.onceEvents[msg.Name]; ok {
+				delete(s.onceEvents, msg.Name)
+				delete(s.eventMap, msg.Name)
+			}
 		}
 	}
 }

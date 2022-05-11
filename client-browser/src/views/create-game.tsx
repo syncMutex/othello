@@ -1,17 +1,17 @@
 import "./create-game.scss"
-import { useUserName } from "../hooks/user-name"
+import { usePlayerName } from "../hooks/player-name"
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 type Side = "black" | "white";
 
 export default function CreateGame() { 
-  const [userName] = useUserName();
+  const [userName] = usePlayerName();
   const [curSide, setCurSide] = useState<Side>("black")
   const navigate = useNavigate();
 
   const createLobby = async () => {
-    const res = await fetch("http://localhost:5000/api/create-lobby", {
+    const res = await fetch(`http://${location.hostname}:5000/api/create-lobby`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -20,13 +20,14 @@ export default function CreateGame() {
       })
     })
     const data = await res.json();
-    sessionStorage.gameId = data.gameId;
-    navigate(`/lobby/${data.gameId}`);
+    if(data.err) return;
+    sessionStorage.side = curSide;
+    navigate(`/lobby/${data.gameId}`, { state: { side: curSide } });
   }
 
   return (<div className="create-game-page">
     <h1>Create Game</h1>
-    <div className="create-game-container">
+    <div className="create-game-container page-card-dark">
       <div className="game-name">
         <span className="username">{userName}</span>'s game
       </div> 

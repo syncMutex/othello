@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom"
-import { useUserName } from "../hooks/user-name"
+import { usePlayerName } from "../hooks/player-name"
 import "./home.scss"
 
 export default function Home() {
-  const [userName] = useUserName();
+  const [playerName] = usePlayerName();
 
   return (<div className="home-page">
     <div>
-      <h1>Welcome <span className="username">{userName}</span></h1>
+      <h1>Welcome <span className="username">{playerName}</span></h1>
       <Link className="link" to="/create-game">
         Create game
       </Link>

@@ -1,10 +1,10 @@
 import "./change-name.scss";
 import React, { ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useUserName } from "../hooks/user-name";
+import { usePlayerName } from "../hooks/player-name";
 
 export default function ChangeName() {
-  const [newUserName, setNewUserName] = useUserName();
+  const [newPlayerName, setNewPlayerName] = usePlayerName();
   const navigate = useNavigate();
 
   return (<div className="change-username">
@@ -14,8 +14,8 @@ export default function ChangeName() {
         <div className="form-field">
           <input
             type="text" 
-            value={newUserName}
-            onChange={(e:ChangeEvent<HTMLInputElement>) => setNewUserName(e.target.value)} 
+            value={newPlayerName}
+            onChange={(e:ChangeEvent<HTMLInputElement>) => setNewPlayerName(e.target.value)} 
             data-theme="dark" 
             maxLength={18}
             spellCheck="false"
@@ -27,11 +27,11 @@ export default function ChangeName() {
           <button 
             className="btn-green" 
             onClick={() => {
-              window.localStorage.userName = newUserName;
+              window.localStorage.playerName = newPlayerName;
               navigate("/")
             }}
             disabled={
-              newUserName === window.localStorage.userName || newUserName.length < 3
+              newPlayerName === window.localStorage.playerName || newPlayerName.length < 3
             }>done</button>
         </div>
       </div>

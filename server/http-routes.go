@@ -57,20 +57,48 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func joinGame(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
 	s, err := newSocket(w, r)
 	if err != nil {
 		respondErrMsg(err.Error(), w)
 		return
 	}
-	s.on("test", func(data string) {
-		fmt.Println(data)
+	g := gamesMap.getGameById(params["gameId"])
+	if g == nil {
+		s.emit("game-verified", "false")
+		s.close()
+		return
+	}
+	s.emit("game-verified", "true")
+	g.stopDestruct()
+
+	s.once("join-player-info", func(data []byte) {
+		var pInfo struct {
+			Name string `json:"playerName"`
+			Side string `json:"side"`
+		}
+		err = json.Unmarshal(data, &pInfo)
+		if err != nil {
+			s.close()
+			return
+		}
+		playerId, err := g.joinGame(pInfo.Name, pInfo.Side, s.conn)
+		var res []byte
+		if err != nil {
+			res, _ = json.Marshal(ResponseStruct{Err: true, Msg: err.Error()})
+			s.close()
+		} else {
+			var playerInfo = struct {
+				ResponseStruct
+				PlayerId string `json:"playerId"`
+			}{ResponseStruct{Err: false, Msg: "success"}, playerId}
+			res, _ = json.Marshal(playerInfo)
+		}
+		s.emit("join-player-info-res", string(res))
 	})
-	s.on("some msg", func(data string) {
-		fmt.Println("inside some msg")
-		s.emit("hehehe", "nonon")
-	})
+
 	fmt.Println(s.listen().Error())
-	s.conn.Close()
+	s.close()
 }
 
 func createHttpRoutes() http.Handler {
@@ -81,6 +109,7 @@ func createHttpRoutes() http.Handler {
 
 	r := mainRouter.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/create-lobby", createLobby).Methods(http.MethodPost)
-	r.HandleFunc("/join-game", joinGame)
+	r.HandleFunc("/join-game/{gameId}", joinGame)
+	r.HandleFunc("/reconnect-game/{gameId}", joinGame)
 	return handlers.CORS(headersOk, originsOk, methodsOk)(mainRouter)
 }

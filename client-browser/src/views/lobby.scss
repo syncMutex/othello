@@ -1,0 +1,92 @@
+.loading-screen{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2rem;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  font-family: monospace;
+}
+
+.loading-screen::after{
+  content: "";
+  animation: 2s load-dot infinite;
+}
+
+.lobby-page{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  width: 100%;
+  height: 100%;
+  h1{
+    font-size: 2.5rem;
+  }
+
+  .lobby-container{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 15rem;
+
+    .players{
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .players > div{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-around;
+      height: max-content;
+      font-size: 1.2rem;
+    }
+
+    .black-side > div, .white-side > div{
+      $size: 6rem;
+      width: $size;
+      height: $size;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+
+    .black-side > div{
+      background-color: black;
+    }
+
+    .white-side > div{
+      background-color: white;
+    }
+  }
+}
+
+@keyframes load-dot {
+  0%{
+    content: "";
+  }
+  30%{
+    content: ".";
+  }
+  50%{
+    content: "..";
+  }
+  75%{
+    content: "...";
+  }
+  100%{
+    content: "";
+  }
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log"
 	"time"
 
@@ -10,9 +11,10 @@ import (
 )
 
 type playerStruct struct {
-	name string
-	ws   *websocket.Conn
-	id   string
+	name   string
+	ws     *websocket.Conn
+	id     string
+	isRsvd bool
 }
 
 type lobby struct {
@@ -22,23 +24,33 @@ type lobby struct {
 
 type gameStruct struct {
 	lobby
-	stopDestructChan chan (struct{})
+	gameState          int
+	isGameStarted      bool
+	stopDestructChan   chan (struct{})
+	isDestructChanOpen bool
 }
 
 type gamesMapType map[string]game
 
 type player interface {
+	connect(*websocket.Conn, string)
+	reConnect(*websocket.Conn)
+	disconnect()
+	isIdValid(string) bool
+	isConnected() bool
+	isReserved() bool
+	playerId() string
 }
 
 type game interface {
-	setPlayer(side string, _ player)
-	getStopDestructChan() chan struct{}
+	getStopDestructChan() <-chan struct{}
+	closeChan()
 	stopDestruct()
+	joinGame(name, side string, _ *websocket.Conn) (playerId string, _ error)
 }
 
 type gamesHandler interface {
 	createNewGame(gameName string) (gameId string)
-	joinGame(gameId string, _ player, side string)
 	gameSelfDestructOnIdle(gameId string, _ time.Duration)
 	getGameById(gameId string) game
 }
@@ -53,29 +65,34 @@ func randomString() string {
 }
 
 // player methods
-
-// gamesMapType methods
-func (gm gamesMapType) createNewGame(gameName string) string {
-	gameId := randomString()
-	gm[gameId] = &gameStruct{stopDestructChan: make(chan struct{}), lobby: lobby{}}
-	return gameId
+func (p *playerStruct) isIdValid(id string) bool {
+	return p.id == id
 }
 
-func (gm gamesMapType) joinGame(gameId string, p player, side string) {
-	g := gm[gameId]
-	g.setPlayer(side, p)
+func (p *playerStruct) connect(ws *websocket.Conn, name string) {
+	p.ws = ws
+	p.isRsvd = true
+	p.name = name
 }
 
-func (gm gamesMapType) gameSelfDestructOnIdle(gameId string, dur time.Duration) {
-	select {
-	case <-gm[gameId].getStopDestructChan():
-	case <-time.After(dur):
-		delete(gm, gameId)
-	}
+func (p *playerStruct) reConnect(ws *websocket.Conn) {
+	p.ws = ws
 }
 
-func (gm gamesMapType) getGameById(gameId string) game {
-	return gm[gameId]
+func (p *playerStruct) disconnect() {
+	p.ws = nil
+}
+
+func (p *playerStruct) isConnected() bool {
+	return p.ws != nil
+}
+
+func (p *playerStruct) isReserved() bool {
+	return p.isRsvd
+}
+
+func (p *playerStruct) playerId() string {
+	return p.id
 }
 
 // gameStruct methods
@@ -87,17 +104,68 @@ func (g *gameStruct) setPlayer(side string, p player) {
 	}
 }
 
-func (g *gameStruct) getStopDestructChan() chan struct{} {
+func (g *gameStruct) joinGame(name, side string, ws *websocket.Conn) (playerId string, retErr error) {
+	switch side {
+	case "black":
+		if g.blackSide.isReserved() {
+			return "", errors.New("black side already reserved.")
+		}
+		g.blackSide.connect(ws, name)
+		playerId = g.blackSide.playerId()
+	case "white":
+		if g.whiteSide.isReserved() {
+			return "", errors.New("black side already reserved.")
+		}
+		g.whiteSide.connect(ws, name)
+		playerId = g.whiteSide.playerId()
+	default:
+		retErr = errors.New("unknown side.")
+	}
+	return
+}
+
+func (g *gameStruct) getStopDestructChan() <-chan struct{} {
 	return g.stopDestructChan
 }
 
+func (g *gameStruct) closeChan() {
+	close(g.stopDestructChan)
+	g.isDestructChanOpen = false
+}
+
 func (g *gameStruct) stopDestruct() {
-	g.stopDestructChan <- struct{}{}
+	if g.isDestructChanOpen {
+		g.stopDestructChan <- struct{}{}
+	}
+}
+
+// gamesMapType methods
+func (gm gamesMapType) createNewGame(gameName string) string {
+	gameId := randomString()
+	gm[gameId] = &gameStruct{
+		stopDestructChan:   make(chan struct{}),
+		isDestructChanOpen: true,
+		lobby:              lobby{blackSide: newPlayer(), whiteSide: newPlayer()},
+	}
+	return gameId
+}
+
+func (gm gamesMapType) gameSelfDestructOnIdle(gameId string, dur time.Duration) {
+	select {
+	case <-gm[gameId].getStopDestructChan():
+		gm[gameId].closeChan()
+	case <-time.After(dur):
+		delete(gm, gameId)
+	}
+}
+
+func (gm gamesMapType) getGameById(gameId string) game {
+	return gm[gameId]
 }
 
 var gamesMap gamesHandler = make(gamesMapType)
 
-func newPlayer(ws *websocket.Conn, name string) player {
-	var p player = &playerStruct{ws: ws, name: name, id: randomString()}
+func newPlayer() player {
+	var p player = &playerStruct{id: randomString()}
 	return p
 }
