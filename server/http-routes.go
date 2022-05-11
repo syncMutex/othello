@@ -101,6 +101,25 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	s.close()
 }
 
+func gameName(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	if g := gamesMap.getGameById(params["gameId"]); g != nil {
+		res := struct {
+			ResponseStruct
+			GameName string `json:"lobbyName"`
+		}{
+			GameName: g.getGameName(),
+			ResponseStruct: ResponseStruct{
+				Msg: "success",
+				Err: false,
+			},
+		}
+		json.NewEncoder(w).Encode(res)
+	} else {
+		respondErrMsg("game doesn't exist.", w)
+	}
+}
+
 func createHttpRoutes() http.Handler {
 	headersOk := handlers.AllowedHeaders([]string{"Content-Type"})
 	originsOk := handlers.AllowedOrigins([]string{"*"})
@@ -110,6 +129,7 @@ func createHttpRoutes() http.Handler {
 	r := mainRouter.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/create-lobby", createLobby).Methods(http.MethodPost)
 	r.HandleFunc("/join-game/{gameId}", joinGame)
+	r.HandleFunc("/game-name/{gameId}", gameName)
 	r.HandleFunc("/reconnect-game/{gameId}", joinGame)
 	return handlers.CORS(headersOk, originsOk, methodsOk)(mainRouter)
 }

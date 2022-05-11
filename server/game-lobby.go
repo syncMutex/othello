@@ -25,6 +25,7 @@ type lobby struct {
 type gameStruct struct {
 	lobby
 	gameState          int
+	gameName           string
 	isGameStarted      bool
 	stopDestructChan   chan (struct{})
 	isDestructChanOpen bool
@@ -47,6 +48,7 @@ type game interface {
 	closeChan()
 	stopDestruct()
 	joinGame(name, side string, _ *websocket.Conn) (playerId string, _ error)
+	getGameName() string
 }
 
 type gamesHandler interface {
@@ -104,7 +106,18 @@ func (g *gameStruct) setPlayer(side string, p player) {
 	}
 }
 
+func (g *gameStruct) checkHost(name string) {
+	if !g.blackSide.isReserved() && !g.whiteSide.isReserved() {
+		g.gameName = name
+	}
+}
+
+func (g *gameStruct) getGameName() string {
+	return g.gameName
+}
+
 func (g *gameStruct) joinGame(name, side string, ws *websocket.Conn) (playerId string, retErr error) {
+	g.checkHost(name)
 	switch side {
 	case "black":
 		if g.blackSide.isReserved() {

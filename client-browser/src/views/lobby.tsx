@@ -3,6 +3,7 @@ import { useContext, useEffect, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
+import { useLoadingScreen } from "../hooks/ui";
 
 export default function Lobby() {
   const [playerName] = usePlayerName();
@@ -10,7 +11,7 @@ export default function Lobby() {
   const params = useParams();
   const state = useLocation() as any;
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [RenderIsLoading, setIsLoading] = useLoadingScreen("Loading", true);
   const [blackSideName, setBlackSideName] = useState<string>("");
   const [whiteSideName, setWhiteSideName] = useState<string>("");
   const side = state.side || sessionStorage.side;
@@ -38,19 +39,20 @@ export default function Lobby() {
   }, [])
   return (<div className="lobby-page">
     <h1>Lobby</h1>
-    {isLoading && <div className="loading-screen">Loading</div>}
-    <div className="lobby-container page-card-dark">
-      <div className="players">
-        <div className="black-side">
-          <div></div>
-          {blackSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
+    <RenderIsLoading>
+      <div className="lobby-container page-card-dark">
+        <div className="players">
+          <div className="black-side">
+            <div></div>
+            {blackSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
+          </div>
+          <div className="white-side">
+            <div></div>
+            {whiteSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
+          </div>
         </div>
-        <div className="white-side">
-          <div></div>
-          {whiteSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
-        </div>
+        <div>{lobbyMsg}</div>
       </div>
-      <div>{lobbyMsg}</div>
-    </div>
+    </RenderIsLoading>
   </div>)
 }

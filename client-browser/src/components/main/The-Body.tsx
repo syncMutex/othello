@@ -13,7 +13,7 @@ export default function TheBody() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/create-game" element={<CreateGame />} />
-        <Route path="/join-game" element={<JoinGame />} />
+        <Route path="/join-game/:gameId" element={<JoinGame />} />
         <Route path="/lobby/:gameId" element={<Lobby />} />
         <Route path="/game/:gameId" element={<Game />} />
         <Route path="/change-username" element={<ChangeName />} />
