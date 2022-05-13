@@ -53,7 +53,7 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 		ResponseStruct
 		GameId string `json:"gameId"`
 	}{GameId: gameId, ResponseStruct: ResponseStruct{Msg: "success", Err: false}})
-	go gamesMap.gameSelfDestructOnIdle(gameId, time.Duration(time.Second*20))
+	go gamesMap.gameSelfDestructOnIdle(gameId, time.Duration(time.Second*10))
 }
 
 func joinGame(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +63,9 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		respondErrMsg(err.Error(), w)
 		return
 	}
-	g := gamesMap.getGameById(params["gameId"])
+	var playerId string
+	gameId := params["gameId"]
+	g := gamesMap.getGameById(gameId)
 	if g == nil {
 		s.emit("game-verified", "false")
 		s.close()
@@ -82,7 +84,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 			s.close()
 			return
 		}
-		playerId, err := g.joinGame(pInfo.Name, pInfo.Side, s.conn)
+		playerId, err = g.joinGame(pInfo.Name, pInfo.Side, s.conn)
 		var res []byte
 		if err != nil {
 			res, _ = json.Marshal(ResponseStruct{Err: true, Msg: err.Error()})
@@ -98,6 +100,11 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	})
 
 	fmt.Println(s.listen().Error())
+	g.getPlayerById(playerId).disconnect()
+
+	if g.isGameIdle() {
+		gamesMap.gameSelfDestructOnIdle(gameId, time.Second*10)
+	}
 	s.close()
 }
 

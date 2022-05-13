@@ -105,6 +105,31 @@ input[type=text]:focus ~ label, input[type=text]:valid ~ label{
   animation: 2s load-dot infinite;
 }
 
+.copied-msg{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  padding: 0.5rem 2rem;
+  height: 3rem;
+  font-size: 1.2rem;
+  bottom: 10rem;
+  left: 50%;
+  background-color: rgb(41, 41, 41);
+
+  &[data-theme="dark"]{
+    background-color: rgb(255, 255, 255);
+    color: black;
+  }
+
+  color: white;
+  transform: translateX(-50%);
+  z-index: 30;
+  white-space: pre;
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(31, 31, 31, 1);
+}
+
 @keyframes load-dot {
   0%{
     content: "";

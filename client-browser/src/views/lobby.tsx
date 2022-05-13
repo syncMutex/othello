@@ -1,14 +1,37 @@
 import "./lobby.scss";
-import { useContext, useEffect, useState } from "react"
+import { MouseEvent, useContext, useEffect, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
 import { useLoadingScreen } from "../hooks/ui";
+import { useCopyToClipboard } from "../hooks/utils";
+
+
+function Invite({ link }:{ link:string }) {
+  const [copyToClipboard, copiedMsg] = useCopyToClipboard("dark");
+  return (<>
+    <button className="btn-nobg" data-theme="dark" onClick={async (e:MouseEvent) => {
+      (e.target as HTMLButtonElement).disabled = true;
+      if(navigator?.share) {
+        try {
+          await navigator.share({
+            title: "Join Scrum board",
+            url: link
+          })
+        } catch (err) {
+          console.error(err);
+        }
+      } else copyToClipboard(link, 'copied link');
+      (e.target as HTMLButtonElement).disabled = false;
+    }}>invite</button>
+    {copiedMsg}
+  </>)
+}
 
 export default function Lobby() {
   const [playerName] = usePlayerName();
   const socket = useContext(SocketContext);
-  const params = useParams();
+  const { gameId } = useParams();
   const state = useLocation() as any;
   const navigate = useNavigate();
   const [RenderIsLoading, setIsLoading] = useLoadingScreen("Loading", true);
@@ -18,7 +41,7 @@ export default function Lobby() {
   const [lobbyMsg, setLobbyMsg] = useState<string>();
 
   useEffect(() => {
-    socketConnect(`ws://${location.hostname}:5000/api/join-game/${params.gameId}`);
+    socketConnect(`ws://${location.hostname}:5000/api/join-game/${gameId}`);
 
     // I mean, the json parser is parsing "true" as true. don't ask why
     socket.on("game-verified", (s:boolean) => {
@@ -37,6 +60,8 @@ export default function Lobby() {
     })
     socket.onClose(() => navigate("/"))
   }, [])
+
+  const Inv = <Invite link={`http://${location.hostname}:3000/join-game/${gameId}`} />
   return (<div className="lobby-page">
     <h1>Lobby</h1>
     <RenderIsLoading>
@@ -44,11 +69,11 @@ export default function Lobby() {
         <div className="players">
           <div className="black-side">
             <div></div>
-            {blackSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
+            {blackSideName || Inv}
           </div>
           <div className="white-side">
             <div></div>
-            {whiteSideName || <button className="btn-nobg" data-theme="dark">invite</button>}
+            {whiteSideName || Inv}
           </div>
         </div>
         <div>{lobbyMsg}</div>

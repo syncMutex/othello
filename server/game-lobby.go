@@ -46,15 +46,19 @@ type player interface {
 type game interface {
 	getStopDestructChan() <-chan struct{}
 	closeChan()
+	openChan()
 	stopDestruct()
 	joinGame(name, side string, _ *websocket.Conn) (playerId string, _ error)
 	getGameName() string
+	isGameIdle() bool
+	getPlayerById(string) player
 }
 
 type gamesHandler interface {
 	createNewGame(gameName string) (gameId string)
 	gameSelfDestructOnIdle(gameId string, _ time.Duration)
 	getGameById(gameId string) game
+	deleteGame(gameId string)
 }
 
 func randomString() string {
@@ -106,6 +110,15 @@ func (g *gameStruct) setPlayer(side string, p player) {
 	}
 }
 
+func (g *gameStruct) getPlayerById(pid string) player {
+	if g.blackSide.isIdValid(pid) {
+		return g.blackSide
+	} else if g.whiteSide.isIdValid(pid) {
+		return g.whiteSide
+	}
+	return nil
+}
+
 func (g *gameStruct) checkHost(name string) {
 	if !g.blackSide.isReserved() && !g.whiteSide.isReserved() {
 		g.gameName = name
@@ -114,6 +127,10 @@ func (g *gameStruct) checkHost(name string) {
 
 func (g *gameStruct) getGameName() string {
 	return g.gameName
+}
+
+func (g *gameStruct) isGameIdle() bool {
+	return !g.blackSide.isConnected() && !g.whiteSide.isConnected()
 }
 
 func (g *gameStruct) joinGame(name, side string, ws *websocket.Conn) (playerId string, retErr error) {
@@ -142,8 +159,18 @@ func (g *gameStruct) getStopDestructChan() <-chan struct{} {
 }
 
 func (g *gameStruct) closeChan() {
-	close(g.stopDestructChan)
-	g.isDestructChanOpen = false
+	if g.isDestructChanOpen {
+		close(g.stopDestructChan)
+		g.isDestructChanOpen = false
+	}
+}
+
+func (g *gameStruct) openChan() {
+	if g.isDestructChanOpen {
+		return
+	}
+	g.stopDestructChan = make(chan struct{})
+	g.isDestructChanOpen = true
 }
 
 func (g *gameStruct) stopDestruct() {
@@ -163,12 +190,18 @@ func (gm gamesMapType) createNewGame(gameName string) string {
 	return gameId
 }
 
+func (gm gamesMapType) deleteGame(gameId string) {
+	delete(gm, gameId)
+}
+
 func (gm gamesMapType) gameSelfDestructOnIdle(gameId string, dur time.Duration) {
+	g := gm[gameId]
+	g.openChan()
 	select {
-	case <-gm[gameId].getStopDestructChan():
-		gm[gameId].closeChan()
+	case <-g.getStopDestructChan():
+		g.closeChan()
 	case <-time.After(dur):
-		delete(gm, gameId)
+		gm.deleteGame(gameId)
 	}
 }
 

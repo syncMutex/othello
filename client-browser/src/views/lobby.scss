@@ -34,7 +34,7 @@
       font-size: 1.2rem;
     }
 
-    .black-side > div, .white-side > div{
+    .black-side > div:first-child, .white-side > div:first-child{
       $size: 6rem;
       width: $size;
       height: $size;
@@ -42,11 +42,11 @@
       margin-bottom: 0.5rem;
     }
 
-    .black-side > div{
+    .black-side > div:first-child{
       background-color: black;
     }
 
-    .white-side > div{
+    .white-side > div:first-child{
       background-color: white;
     }
   }
