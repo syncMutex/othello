@@ -6,7 +6,11 @@ export class Socket{
   private queuedEmitsBeforeConn:{evName:string,data:any}[] = [];
 
   onClose(cb:() => void) {
-    this.conn?.addEventListener("close", cb)
+    const closeEventCb = () => {
+      cb();
+      this.conn?.removeEventListener("close", closeEventCb)
+    }
+    this.conn?.addEventListener("close", closeEventCb)
   }
 
   async connect(url:string) {

@@ -1,16 +1,15 @@
 import "./join-game.scss";
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { usePlayerName } from "../hooks/player-name";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useLoadingScreen } from "../hooks/ui";
 import { useEffectAbortControlled } from "../hooks/utils";
 
 export default function JoinGame() {
-  const [playerName, setPlayerName] = usePlayerName();
   const [errMsg, setErrMsg] = useState<string>("");
   const [lobbyName, setLobbyName] = useState<string>('');
   const [RenderLoadingScreen, setIsLoading] = useLoadingScreen("fetching game name", true);
   const params = useParams();
+  const navigate = useNavigate();
 
   useEffectAbortControlled(async (c:AbortController) => {
     try {
@@ -44,7 +43,9 @@ export default function JoinGame() {
             <h2>Join <span className="username">{lobbyName}</span>'s lobby?</h2>
             <div className="flex-btns">
               <Link to="/" className="btn-nobg link-btn" data-theme="dark">cancel</Link>
-              <button className="btn-green">join</button>
+              <button onClick={() => {
+                navigate(`/lobby/${params.gameId}`)
+              }} className="btn-green">join</button>
             </div>
           </>)
         }</div>

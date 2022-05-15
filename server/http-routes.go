@@ -5,30 +5,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"othelloServer/respond"
+	"othelloServer/socket"
 	"time"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
-type ResponseStruct struct {
-	Err bool   `json:"err"`
-	Msg string `json:"msg"`
-}
-
-func respondErrMsg(msg string, w http.ResponseWriter) {
-	res := ResponseStruct{Msg: msg, Err: true}
-	json.NewEncoder(w).Encode(res)
-}
-
-func respondSuccess(w http.ResponseWriter) {
-	json.NewEncoder(w).Encode(ResponseStruct{Err: false, Msg: "success"})
-}
-
 func createLobby(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		respondErrMsg(err.Error(), w)
+		respond.RespondErrMsg(err.Error(), w)
 		return
 	}
 
@@ -39,91 +27,102 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 
 	err = json.Unmarshal(body, &gameDetails)
 	if err != nil {
-		respondErrMsg(err.Error(), w)
+		respond.RespondErrMsg(err.Error(), w)
 		return
 	}
 
 	if gameDetails.HostName == "" || (gameDetails.HostSide != "black" && gameDetails.HostSide != "white") {
-		respondErrMsg("invalid data.", w)
+		respond.RespondErrMsg("invalid data.", w)
 		return
 	}
 
 	gameId := gamesMap.createNewGame(gameDetails.HostName)
 	json.NewEncoder(w).Encode(struct {
-		ResponseStruct
+		respond.ResponseStruct
 		GameId string `json:"gameId"`
-	}{GameId: gameId, ResponseStruct: ResponseStruct{Msg: "success", Err: false}})
+	}{GameId: gameId, ResponseStruct: respond.ResponseStruct{Msg: "success", Err: false}})
 	go gamesMap.gameSelfDestructOnIdle(gameId, time.Duration(time.Second*10))
 }
 
 func joinGame(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	s, err := newSocket(w, r)
+	s, err := socket.NewSocket(w, r)
 	if err != nil {
-		respondErrMsg(err.Error(), w)
+		respond.RespondErrMsg(err.Error(), w)
 		return
 	}
 	var playerId string
 	gameId := params["gameId"]
 	g := gamesMap.getGameById(gameId)
 	if g == nil {
-		s.emit("game-verified", "false")
-		s.close()
+		s.Emit("game-verified", "false")
+		s.Close()
 		return
 	}
-	s.emit("game-verified", "true")
+	s.Emit("game-verified", "true")
 	g.stopDestruct()
 
-	s.once("join-player-info", func(data []byte) {
+	s.Once("join-player-info", func(data []byte) {
 		var pInfo struct {
 			Name string `json:"playerName"`
 			Side string `json:"side"`
 		}
 		err = json.Unmarshal(data, &pInfo)
 		if err != nil {
-			s.close()
+			s.Close()
 			return
 		}
-		playerId, err = g.joinGame(pInfo.Name, pInfo.Side, s.conn)
+
+		if pInfo.Side == "" {
+			if pInfo.Side = g.getEmptySide(); pInfo.Side == "" {
+				s.EmitErr("join-player-info-res", "game full.").Close()
+				return
+			}
+		}
+
+		playerId, err = g.joinGame(pInfo.Name, pInfo.Side, s)
 		var res []byte
 		if err != nil {
-			res, _ = json.Marshal(ResponseStruct{Err: true, Msg: err.Error()})
-			s.close()
-		} else {
-			var playerInfo = struct {
-				ResponseStruct
-				PlayerId string `json:"playerId"`
-			}{ResponseStruct{Err: false, Msg: "success"}, playerId}
-			res, _ = json.Marshal(playerInfo)
+			s.EmitErr("join-player-info-res", err.Error()).Close()
+			return
 		}
-		s.emit("join-player-info-res", string(res))
+		var playerInfo = struct {
+			respond.ResponseStruct
+			PlayerId string `json:"playerId"`
+			Side     string `json:"side"`
+		}{respond.ResponseStruct{Err: false, Msg: "success"}, playerId, pInfo.Side}
+		res, _ = json.Marshal(playerInfo)
+		s.Emit("join-player-info-res", string(res))
+		g.broadcast("lobby-info", g.getLobbyInfoJson())
 	})
 
-	fmt.Println(s.listen().Error())
-	g.getPlayerById(playerId).disconnect()
+	fmt.Println(s.Listen().Error())
+	if g.getPlayerById(playerId) != nil {
+		g.getPlayerById(playerId).disconnect()
+	}
 
 	if g.isGameIdle() {
 		gamesMap.gameSelfDestructOnIdle(gameId, time.Second*10)
 	}
-	s.close()
+	s.Close()
 }
 
 func gameName(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	if g := gamesMap.getGameById(params["gameId"]); g != nil {
 		res := struct {
-			ResponseStruct
+			respond.ResponseStruct
 			GameName string `json:"lobbyName"`
 		}{
 			GameName: g.getGameName(),
-			ResponseStruct: ResponseStruct{
+			ResponseStruct: respond.ResponseStruct{
 				Msg: "success",
 				Err: false,
 			},
 		}
 		json.NewEncoder(w).Encode(res)
 	} else {
-		respondErrMsg("game doesn't exist.", w)
+		respond.RespondErrMsg("game doesn't exist.", w)
 	}
 }
 

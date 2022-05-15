@@ -51,12 +51,17 @@ export default function Lobby() {
         navigate("/")
     })
 
-    socket.on("join-player-info-res", (data:{ playerId:string, err:boolean, msg:string }) => {
+    socket.on("join-player-info-res", (data:{ playerId:string, side:string, err:boolean, msg:string }) => {
       if(data.err) return;
-      if(side === "black") setBlackSideName(playerName);
+      if(data.side === "black") setBlackSideName(playerName);
       else setWhiteSideName(playerName);
       setIsLoading(false);
       setLobbyMsg("waiting for your opponent...")
+    })
+
+    socket.on("lobby-info", (lobby:{ black:string, white:string }={black: "", white: ""}) => {
+      setBlackSideName(lobby.black);
+      setWhiteSideName(lobby.white);
     })
     socket.onClose(() => navigate("/"))
   }, [])

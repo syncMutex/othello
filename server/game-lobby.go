@@ -3,27 +3,23 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log"
+	"othelloServer/socket"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 type playerStruct struct {
+	s      socket.Socket
 	name   string
-	ws     *websocket.Conn
 	id     string
 	isRsvd bool
 }
 
-type lobby struct {
-	blackSide player
-	whiteSide player
-}
-
 type gameStruct struct {
-	lobby
+	blackSide          player
+	whiteSide          player
 	gameState          int
 	gameName           string
 	isGameStarted      bool
@@ -34,13 +30,15 @@ type gameStruct struct {
 type gamesMapType map[string]game
 
 type player interface {
-	connect(*websocket.Conn, string)
-	reConnect(*websocket.Conn)
+	Emit(string, string)
+	connect(socket.Socket, string)
+	reConnect(socket.Socket)
 	disconnect()
 	isIdValid(string) bool
 	isConnected() bool
 	isReserved() bool
 	playerId() string
+	playerName() string
 }
 
 type game interface {
@@ -48,10 +46,20 @@ type game interface {
 	closeChan()
 	openChan()
 	stopDestruct()
-	joinGame(name, side string, _ *websocket.Conn) (playerId string, _ error)
-	getGameName() string
+
+	joinGame(name, side string, _ socket.Socket) (playerId string, _ error)
+
 	isGameIdle() bool
+	isGameFull() bool
+
+	broadcast(string, string)
+	emitWhite(string, string)
+	emitBlack(string, string)
+
+	getGameName() string
 	getPlayerById(string) player
+	getEmptySide() string
+	getLobbyInfoJson() string
 }
 
 type gamesHandler interface {
@@ -71,26 +79,34 @@ func randomString() string {
 }
 
 // player methods
+func (p *playerStruct) playerName() string {
+	return p.name
+}
+
+func (p *playerStruct) Emit(evName, data string) {
+	p.s.Emit(evName, data)
+}
+
 func (p *playerStruct) isIdValid(id string) bool {
 	return p.id == id
 }
 
-func (p *playerStruct) connect(ws *websocket.Conn, name string) {
-	p.ws = ws
+func (p *playerStruct) connect(s socket.Socket, name string) {
+	p.s = s
 	p.isRsvd = true
 	p.name = name
 }
 
-func (p *playerStruct) reConnect(ws *websocket.Conn) {
-	p.ws = ws
+func (p *playerStruct) reConnect(s socket.Socket) {
+	p.s = s
 }
 
 func (p *playerStruct) disconnect() {
-	p.ws = nil
+	p.s = nil
 }
 
 func (p *playerStruct) isConnected() bool {
-	return p.ws != nil
+	return p.s != nil
 }
 
 func (p *playerStruct) isReserved() bool {
@@ -102,12 +118,53 @@ func (p *playerStruct) playerId() string {
 }
 
 // gameStruct methods
+
+func (g *gameStruct) broadcast(evName, data string) {
+	g.emitBlack(evName, data)
+	g.emitWhite(evName, data)
+}
+
+func (g *gameStruct) emitBlack(evName, data string) {
+	if g.blackSide.isConnected() {
+		g.blackSide.Emit(evName, data)
+	}
+}
+
+func (g *gameStruct) emitWhite(evName, data string) {
+	if g.whiteSide.isConnected() {
+		g.whiteSide.Emit(evName, data)
+	}
+}
+
+func (g *gameStruct) getLobbyInfoJson() string {
+	lobby := struct {
+		Black string `json:"black"`
+		White string `json:"white"`
+	}{g.blackSide.playerName(), g.whiteSide.playerName()}
+
+	j, _ := json.Marshal(lobby)
+	return string(j)
+}
+
 func (g *gameStruct) setPlayer(side string, p player) {
 	if side == "black" {
 		g.blackSide = p
 	} else if side == "white" {
 		g.whiteSide = p
 	}
+}
+
+func (g *gameStruct) isGameFull() bool {
+	return g.blackSide.isReserved() && g.whiteSide.isReserved()
+}
+
+func (g *gameStruct) getEmptySide() string {
+	if !g.blackSide.isReserved() {
+		return "black"
+	} else if !g.whiteSide.isReserved() {
+		return "white"
+	}
+	return ""
 }
 
 func (g *gameStruct) getPlayerById(pid string) player {
@@ -133,20 +190,20 @@ func (g *gameStruct) isGameIdle() bool {
 	return !g.blackSide.isConnected() && !g.whiteSide.isConnected()
 }
 
-func (g *gameStruct) joinGame(name, side string, ws *websocket.Conn) (playerId string, retErr error) {
+func (g *gameStruct) joinGame(name, side string, s socket.Socket) (playerId string, retErr error) {
 	g.checkHost(name)
 	switch side {
 	case "black":
 		if g.blackSide.isReserved() {
 			return "", errors.New("black side already reserved.")
 		}
-		g.blackSide.connect(ws, name)
+		g.blackSide.connect(s, name)
 		playerId = g.blackSide.playerId()
 	case "white":
 		if g.whiteSide.isReserved() {
 			return "", errors.New("black side already reserved.")
 		}
-		g.whiteSide.connect(ws, name)
+		g.whiteSide.connect(s, name)
 		playerId = g.whiteSide.playerId()
 	default:
 		retErr = errors.New("unknown side.")
@@ -185,7 +242,8 @@ func (gm gamesMapType) createNewGame(gameName string) string {
 	gm[gameId] = &gameStruct{
 		stopDestructChan:   make(chan struct{}),
 		isDestructChanOpen: true,
-		lobby:              lobby{blackSide: newPlayer(), whiteSide: newPlayer()},
+		blackSide:          newPlayer(),
+		whiteSide:          newPlayer(),
 	}
 	return gameId
 }
