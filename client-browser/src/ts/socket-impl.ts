@@ -13,8 +13,9 @@ export class Socket{
     this.conn?.addEventListener("close", closeEventCb)
   }
 
-  async connect(url:string) {
+  async connect(url:string, onerror:(e:Event) => void) {
     this.conn = new WebSocket(url);
+    this.conn.onerror = onerror;
     this.conn.addEventListener("message", (e:MessageEvent) => {
       const msg:{ name:string, data:string } = JSON.parse(e.data);
       if(!(msg.name in this.eventMap)) return; 

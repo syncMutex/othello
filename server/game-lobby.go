@@ -17,12 +17,18 @@ type playerStruct struct {
 	isRsvd bool
 }
 
+const (
+	// game states
+	GAME_NOT_STARTED = iota
+	GAME_STARTED
+	GAME_OVER
+)
+
 type gameStruct struct {
 	blackSide          player
 	whiteSide          player
 	gameState          int
 	gameName           string
-	isGameStarted      bool
 	stopDestructChan   chan (struct{})
 	isDestructChanOpen bool
 }
@@ -51,6 +57,7 @@ type game interface {
 
 	isGameIdle() bool
 	isGameFull() bool
+	isGameStarted() bool
 
 	broadcast(string, string)
 	emitWhite(string, string)
@@ -158,6 +165,10 @@ func (g *gameStruct) isGameFull() bool {
 	return g.blackSide.isReserved() && g.whiteSide.isReserved()
 }
 
+func (g *gameStruct) isGameStarted() bool {
+	return g.gameState == GAME_STARTED
+}
+
 func (g *gameStruct) getEmptySide() string {
 	if !g.blackSide.isReserved() {
 		return "black"
@@ -244,6 +255,7 @@ func (gm gamesMapType) createNewGame(gameName string) string {
 		isDestructChanOpen: true,
 		blackSide:          newPlayer(),
 		whiteSide:          newPlayer(),
+		gameState:          GAME_NOT_STARTED,
 	}
 	return gameId
 }

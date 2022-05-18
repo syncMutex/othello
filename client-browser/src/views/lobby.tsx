@@ -1,10 +1,10 @@
 import "./lobby.scss";
 import { MouseEvent, useContext, useEffect, useState } from "react"
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
 import { useLoadingScreen } from "../hooks/ui";
-import { useCopyToClipboard } from "../hooks/utils";
+import { useCopyToClipboard, useEffectAbortControlled } from "../hooks/utils";
 
 
 function Invite({ link }:{ link:string }) {
@@ -38,10 +38,37 @@ export default function Lobby() {
   const [blackSideName, setBlackSideName] = useState<string>("");
   const [whiteSideName, setWhiteSideName] = useState<string>("");
   const side = state.side || sessionStorage.side;
-  const [lobbyMsg, setLobbyMsg] = useState<string>();
+  const [lobbyMsg, setLobbyMsg] = useState<string>("");
+  const [errMsg, setErrMsg] = useState<string>("");
 
-  useEffect(() => {
-    socketConnect(`ws://${location.hostname}:5000/api/join-game/${gameId}`);
+  useEffectAbortControlled(async (c:AbortController) => {
+    try {
+      const res = await fetch(`http://${location.hostname}:5000/api/game-info/${gameId}`, {
+        method: "GET",
+        signal: c.signal
+      });
+      const data = await res.json();
+      if(data.err || !res.ok) {
+        setErrMsg(data.msg);
+        setIsLoading(false);
+        return
+      }
+      if(data.isLobbyFull) {
+        setErrMsg(`${data.lobbyName}'s game is full.`);
+        setIsLoading(false);
+        return
+      }
+    } catch(err) {
+      setErrMsg("Something went wrong. Maybe try checking your connection.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(false);
+
+    socketConnect(`ws://${location.hostname}:5000/api/join-game/${gameId}`, () => {
+      setErrMsg("Something went wrong. Maybe try checking your connection.")
+      setIsLoading(false);
+    });
 
     // I mean, the json parser is parsing "true" as true. don't ask why
     socket.on("game-verified", (s:boolean) => {
@@ -52,7 +79,7 @@ export default function Lobby() {
     })
 
     socket.on("join-player-info-res", (data:{ playerId:string, side:string, err:boolean, msg:string }) => {
-      if(data.err) return;
+      if(data.err) return setErrMsg(data.msg);
       if(data.side === "black") setBlackSideName(playerName);
       else setWhiteSideName(playerName);
       setIsLoading(false);
@@ -63,12 +90,19 @@ export default function Lobby() {
       setBlackSideName(lobby.black);
       setWhiteSideName(lobby.white);
     })
-    socket.onClose(() => navigate("/"))
+
+    socket.on("countdown-begin", () => {
+      console.log("begin coutdown")
+    })
   }, [])
 
   const Inv = <Invite link={`http://${location.hostname}:3000/join-game/${gameId}`} />
   return (<div className="lobby-page">
     <h1>Lobby</h1>
+    {errMsg !== "" ? <div className="lobby-container page-card-dark">
+      <h2 style={{ marginBottom: "2rem" }}>{errMsg}</h2>
+      <Link to="/" className="btn-nobg link-btn" data-theme="dark">go home</Link>
+    </div> :
     <RenderIsLoading>
       <div className="lobby-container page-card-dark">
         <div className="players">
@@ -83,6 +117,6 @@ export default function Lobby() {
         </div>
         <div>{lobbyMsg}</div>
       </div>
-    </RenderIsLoading>
+    </RenderIsLoading>}
   </div>)
 }

@@ -55,8 +55,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	gameId := params["gameId"]
 	g := gamesMap.getGameById(gameId)
 	if g == nil {
-		s.Emit("game-verified", "false")
-		s.Close()
+		s.EmitErr("game-verified", "false").Close()
 		return
 	}
 	s.Emit("game-verified", "true")
@@ -75,7 +74,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 
 		if pInfo.Side == "" {
 			if pInfo.Side = g.getEmptySide(); pInfo.Side == "" {
-				s.EmitErr("join-player-info-res", "game full.").Close()
+				s.EmitErr("join-player-info-res", "game full :(").Close()
 				return
 			}
 		}
@@ -94,6 +93,10 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		res, _ = json.Marshal(playerInfo)
 		s.Emit("join-player-info-res", string(res))
 		g.broadcast("lobby-info", g.getLobbyInfoJson())
+
+		if g.isGameFull() && !g.isGameStarted() {
+			g.broadcast("countdown-begin", "")
+		}
 	})
 
 	fmt.Println(s.Listen().Error())
@@ -107,14 +110,16 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	s.Close()
 }
 
-func gameName(w http.ResponseWriter, r *http.Request) {
+func gameInfo(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	if g := gamesMap.getGameById(params["gameId"]); g != nil {
 		res := struct {
 			respond.ResponseStruct
-			GameName string `json:"lobbyName"`
+			GameName    string `json:"lobbyName"`
+			IsLobbyFull bool   `json:"isLobbyFull"`
 		}{
-			GameName: g.getGameName(),
+			GameName:    g.getGameName(),
+			IsLobbyFull: g.isGameFull(),
 			ResponseStruct: respond.ResponseStruct{
 				Msg: "success",
 				Err: false,
@@ -135,7 +140,7 @@ func createHttpRoutes() http.Handler {
 	r := mainRouter.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/create-lobby", createLobby).Methods(http.MethodPost)
 	r.HandleFunc("/join-game/{gameId}", joinGame)
-	r.HandleFunc("/game-name/{gameId}", gameName)
+	r.HandleFunc("/game-info/{gameId}", gameInfo)
 	r.HandleFunc("/reconnect-game/{gameId}", joinGame)
 	return handlers.CORS(headersOk, originsOk, methodsOk)(mainRouter)
 }
