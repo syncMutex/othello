@@ -92,7 +92,15 @@ export default function Lobby() {
     })
 
     socket.on("countdown-begin", () => {
-      console.log("begin coutdown")
+      let countdownVal = 6;
+      const int = setInterval(() => {
+        if(countdownVal--)
+          setLobbyMsg(`Game will start in ${countdownVal}`);
+        else {
+          clearInterval(int);
+          navigate(`/game/${gameId}`)
+        }
+      }, 1000)
     })
   }, [])
 

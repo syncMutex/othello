@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"othelloServer/game"
 	"othelloServer/respond"
 	"othelloServer/socket"
 	"time"
@@ -36,12 +37,12 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameId := gamesMap.createNewGame(gameDetails.HostName)
+	gameId := game.GamesMap.CreateNewGame(gameDetails.HostName)
 	json.NewEncoder(w).Encode(struct {
 		respond.ResponseStruct
 		GameId string `json:"gameId"`
 	}{GameId: gameId, ResponseStruct: respond.ResponseStruct{Msg: "success", Err: false}})
-	go gamesMap.gameSelfDestructOnIdle(gameId, time.Duration(time.Second*10))
+	go game.GamesMap.GameSelfDestructOnIdle(gameId, time.Duration(time.Second*10))
 }
 
 func joinGame(w http.ResponseWriter, r *http.Request) {
@@ -53,33 +54,33 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	}
 	var playerId string
 	gameId := params["gameId"]
-	g := gamesMap.getGameById(gameId)
+	g := game.GamesMap.GetGameById(gameId)
 	if g == nil {
 		s.EmitErr("game-verified", "false").Close()
 		return
 	}
 	s.Emit("game-verified", "true")
-	g.stopDestruct()
+	g.StopDestruct()
 
-	s.Once("join-player-info", func(data []byte) {
+	s.Once("join-player-info", func(b []byte) {
 		var pInfo struct {
 			Name string `json:"playerName"`
 			Side string `json:"side"`
 		}
-		err = json.Unmarshal(data, &pInfo)
+		err = json.Unmarshal(b, &pInfo)
 		if err != nil {
 			s.Close()
 			return
 		}
 
 		if pInfo.Side == "" {
-			if pInfo.Side = g.getEmptySide(); pInfo.Side == "" {
+			if pInfo.Side = g.GetEmptySide(); pInfo.Side == "" {
 				s.EmitErr("join-player-info-res", "game full :(").Close()
 				return
 			}
 		}
 
-		playerId, err = g.joinGame(pInfo.Name, pInfo.Side, s)
+		playerId, err = g.JoinGame(pInfo.Name, pInfo.Side, s)
 		var res []byte
 		if err != nil {
 			s.EmitErr("join-player-info-res", err.Error()).Close()
@@ -92,34 +93,36 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		}{respond.ResponseStruct{Err: false, Msg: "success"}, playerId, pInfo.Side}
 		res, _ = json.Marshal(playerInfo)
 		s.Emit("join-player-info-res", string(res))
-		g.broadcast("lobby-info", g.getLobbyInfoJson())
+		g.Broadcast("lobby-info", g.GetLobbyInfoJson())
 
-		if g.isGameFull() && !g.isGameStarted() {
-			g.broadcast("countdown-begin", "")
+		if g.IsGameFull() && !g.IsGameStarted() {
+			g.Broadcast("countdown-begin", "")
+			<-time.After(time.Second * 5)
+			g.StartGame()
 		}
 	})
 
 	fmt.Println(s.Listen().Error())
-	if g.getPlayerById(playerId) != nil {
-		g.getPlayerById(playerId).disconnect()
+	if p := g.GetPlayerById(playerId); p != nil {
+		p.Disconnect()
 	}
 
-	if g.isGameIdle() {
-		gamesMap.gameSelfDestructOnIdle(gameId, time.Second*10)
+	if g.IsGameIdle() {
+		game.GamesMap.GameSelfDestructOnIdle(gameId, time.Second*10)
 	}
 	s.Close()
 }
 
 func gameInfo(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	if g := gamesMap.getGameById(params["gameId"]); g != nil {
+	if g := game.GamesMap.GetGameById(params["gameId"]); g != nil {
 		res := struct {
 			respond.ResponseStruct
 			GameName    string `json:"lobbyName"`
 			IsLobbyFull bool   `json:"isLobbyFull"`
 		}{
-			GameName:    g.getGameName(),
-			IsLobbyFull: g.isGameFull(),
+			GameName:    g.GetGameName(),
+			IsLobbyFull: g.IsGameFull(),
 			ResponseStruct: respond.ResponseStruct{
 				Msg: "success",
 				Err: false,

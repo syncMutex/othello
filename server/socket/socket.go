@@ -1,7 +1,6 @@
 package socket
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -22,7 +21,6 @@ type wsocket struct {
 	w          http.ResponseWriter
 	r          *http.Request
 	conn       *websocket.Conn
-	ctx        context.Context
 	isAuth     bool
 	eventMap   map[string]func([]byte)
 	onceEvents map[string]struct{}
@@ -53,7 +51,6 @@ func NewSocket(w http.ResponseWriter, r *http.Request) (Socket, error) {
 		conn:       conn,
 		eventMap:   make(map[string]func([]byte)),
 		onceEvents: make(map[string]struct{}),
-		ctx:        context.Background(),
 	}
 	return s, nil
 }
