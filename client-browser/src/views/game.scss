@@ -1,5 +1,5 @@
 :root{
-  --ghost-color: rgba(0, 0, 0, 0.3);
+  --ghost-color: rgb(0, 0, 0);
 }
 
 .game-page{
@@ -28,17 +28,19 @@
       align-items: center;
       position: relative;
       cursor: pointer;
+    }
+    .available::before{
+      content: "";
+      width: 75%;
+      height: 75%;
+      border-radius: 5rem;
+      position: absolute;
+      background-color: var(--ghost-color);
+      opacity: 0.4;
 
-      &:hover{
-        &::before{
-          content: "";
-          width: 75%;
-          height: 75%;
-          border-radius: 5rem;
-          position: absolute;
-          background-color: var(--ghost-color);
-        }
-      }
+    }
+    .available:hover::before{
+      animation: 1s blink linear infinite;
     }
 
     > .color-119, > .color-98{
@@ -74,4 +76,19 @@
 
 .board.enabled{
   pointer-events: all;
+}
+
+@keyframes blink {
+  0%{
+    opacity: 0.4;
+    transform: scale(1, 1);
+  }
+  50%{
+    opacity: 1;
+    transform: scale(1.05, 1.05);
+  }
+  100%{
+    opacity: 0.4;
+    transform: scale(1, 1);
+  }
 }
