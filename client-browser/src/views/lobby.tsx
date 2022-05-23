@@ -82,6 +82,7 @@ export default function Lobby() {
       if(data.err) return setErrMsg(data.msg);
       if(data.side === "black") setBlackSideName(playerName);
       else setWhiteSideName(playerName);
+      sessionStorage.side = data.side
       setIsLoading(false);
       setLobbyMsg("waiting for your opponent...")
     })
@@ -92,7 +93,7 @@ export default function Lobby() {
     })
 
     socket.on("countdown-begin", () => {
-      let countdownVal = 6;
+      let countdownVal = 2;
       const int = setInterval(() => {
         if(countdownVal--)
           setLobbyMsg(`Game will start in ${countdownVal}`);

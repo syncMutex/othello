@@ -80,7 +80,6 @@ func (g *gameStruct) StartGame() {
 	g.initBoard()
 	g.listenSocketEventsFor(g.blackSide)
 	g.listenSocketEventsFor(g.whiteSide)
-	g.EmitBlack("cur-turn", "")
 }
 
 func (g *gameStruct) initBoard() {

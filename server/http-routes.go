@@ -97,7 +97,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 
 		if g.IsGameFull() && !g.IsGameStarted() {
 			g.Broadcast("countdown-begin", "")
-			<-time.After(time.Second * 5)
+			<-time.After(time.Second * 2)
 			g.StartGame()
 		}
 	})
