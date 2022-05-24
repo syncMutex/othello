@@ -36,3 +36,8 @@ export function useCopyToClipboard(theme:string):[(text: string, msg: string) =>
 
   return [copyToClipboard, copiedMsg === '' ? '' : <div className="copied-msg" data-theme={theme}>{copiedMsg}</div>];
 }
+
+export function useForceUpdate() {
+  const [_, setState] = useState(0);
+  return () => setState(prev => prev ? 0 : 1);
+}

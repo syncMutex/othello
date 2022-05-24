@@ -49,8 +49,8 @@ func NewGame() Game {
 	return &gameStruct{
 		stopDestructChan:   make(chan struct{}),
 		isDestructChanOpen: true,
-		blackSide:          player.NewPlayer(RandomString()),
-		whiteSide:          player.NewPlayer(RandomString()),
+		blackSide:          player.NewPlayer(RandomString(), BLACK),
+		whiteSide:          player.NewPlayer(RandomString(), WHITE),
 		gameState:          GAME_NOT_STARTED,
 		curTurn:            BLACK,
 	}
@@ -103,6 +103,14 @@ func (g *gameStruct) EmitBlack(evName, data string) {
 func (g *gameStruct) EmitWhite(evName, data string) {
 	if g.whiteSide.IsConnected() {
 		g.whiteSide.Emit(evName, data)
+	}
+}
+
+func (g *gameStruct) changeTurn() {
+	if g.curTurn == BLACK {
+		g.curTurn = WHITE
+	} else {
+		g.curTurn = BLACK
 	}
 }
 

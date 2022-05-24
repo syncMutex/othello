@@ -7,6 +7,7 @@ type playerStruct struct {
 	name   string
 	id     string
 	isRsvd bool
+	side   rune
 }
 
 type Player interface {
@@ -21,10 +22,12 @@ type Player interface {
 	IsReserved() bool
 	PlayerId() string
 	PlayerName() string
+	Side() rune
+	Opponent() rune
 }
 
-func NewPlayer(id string) Player {
-	var p Player = &playerStruct{id: id}
+func NewPlayer(id string, side rune) Player {
+	var p Player = &playerStruct{id: id, side: side}
 	return p
 }
 
@@ -60,4 +63,16 @@ func (p *playerStruct) IsReserved() bool {
 
 func (p *playerStruct) PlayerId() string {
 	return p.id
+}
+
+func (p *playerStruct) Side() rune {
+	return p.side
+}
+
+func (p *playerStruct) Opponent() rune {
+	if p.side == 'w' {
+		return 'b'
+	} else {
+		return 'w'
+	}
 }
