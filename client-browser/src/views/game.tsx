@@ -9,7 +9,12 @@ const WHITE = 119;
 const EMPTY = 0;
 const isDebug = false;
 
-const LEFT = -1, RIGHT = 1, UP = -1, DOWN = 1;
+const LEFT = -1, RIGHT = 1, UP = -1, DOWN = 1, FIX = 0;
+
+type OnTrueFunc = (_:string) => void;
+type Dir = 1|-1|0;
+type EndPosCallback = (rIdx:number, cIdx:number) => void;
+type CellType = typeof BLACK| typeof WHITE| typeof EMPTY;
 
 export default function Game() {
   const socket = useContext(SocketContext);
@@ -26,16 +31,64 @@ export default function Game() {
     socket.emit("game-state");
     socket.on("game-state-res", (game:{board:Board, curTurn:number}) => {
       game.board[2][4] = WHITE;
-      game.board[4][0] = WHITE;
-      game.board[4][1] = WHITE;
-      game.board[4][2] = WHITE;
       setBoard(game.board);
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
   }, []);
 
+  const isInBounds = (r:number, c:number):boolean => r >= 0 && r < board.length && c >= 0 && c < board[0].length;
+
+  const traverseFrom = (
+    initRow:number,
+    initCol:number,
+    vDir:Dir, hDir:Dir,
+    endCondition:CellType,
+    funcOrBoard:EndPosCallback|Board|null,
+  ) => {
+    let row = initRow + vDir;
+    let col = initCol + hDir;
+    while(isInBounds(row, col) && (board[row][col] === opponentSide)) {
+      row += vDir;
+      col += hDir;
+    }
+    if(board[row][col] === endCondition && (col !== initCol + hDir || row !== initRow + vDir)) {
+      if(funcOrBoard === null) return;
+      if(typeof funcOrBoard === "function") funcOrBoard(row, col);
+      else flipFrom(funcOrBoard, initRow, initCol, vDir, hDir);
+    }
+  }
+
+  const flipFrom = (
+    toFlipBoard:Board,
+    initRow:number,
+    initCol:number,
+    vDir:Dir, hDir:Dir,
+  ) => {
+    let row = initRow + vDir;
+    let col = initCol + hDir;
+    while(isInBounds(row, col) && (toFlipBoard[row][col] === opponentSide)) {
+      console.log(row, col)
+      toFlipBoard[row][col] = mySide;
+      row += vDir;
+      col += hDir;
+    }
+  }
+
+  const traverseAll = (i:number, j:number, ct:CellType, funcOrBoard:EndPosCallback|Board) => {
+    traverseFrom(i, j, UP, FIX, ct, funcOrBoard);
+    traverseFrom(i, j, DOWN, FIX, ct, funcOrBoard);
+    traverseFrom(i, j, FIX, LEFT, ct, funcOrBoard);
+    traverseFrom(i, j, FIX, RIGHT, ct, funcOrBoard);
+    traverseFrom(i, j, UP, RIGHT, ct, funcOrBoard);
+    traverseFrom(i, j, UP, LEFT, ct, funcOrBoard);
+    traverseFrom(i, j, DOWN, LEFT, ct, funcOrBoard);
+    traverseFrom(i, j, DOWN, RIGHT, ct, funcOrBoard);
+  }
+
   const checkMoves = () => {
     const newMoves:Set<string> = new Set();
+    const addFunc = (rIdx:number, cIdx:number) => newMoves.add(`${rIdx}-${cIdx}`);
+
     for(let i = 0; i < board.length; i++) {
       for(let j = 0; j < board[i].length; j++) {
         let cell = board[i][j];
@@ -43,38 +96,7 @@ export default function Game() {
           (cell !== mySide) || 
           (i - 1 < 0)
         ) continue;
-
-        const isInBounds = (r:number, c:number):boolean => r >= 0 && r < board.length && c >= 0 && c < board[0].length;
-
-        let row:number, col:number;
-        const traverseVertic = (mag:-1|1) => {
-          row = i + mag;
-          while(isInBounds(row, j) && (board[row][j] === opponentSide)) row += mag;
-          if(board[row][j] === EMPTY && row !== i + mag) newMoves.add(`${row}-${j}`);
-        }
-        traverseVertic(UP);
-        traverseVertic(DOWN);
-        const tranverseHoriz = (mag:1|-1) => {
-          col = j + mag;
-          while(isInBounds(i, col) && (board[i][col] === opponentSide)) col += mag;
-          if(board[i][col] === EMPTY && col !== j + mag) newMoves.add(`${i}-${col}`);
-        }
-        tranverseHoriz(LEFT);
-        tranverseHoriz(RIGHT);
-        // check up-right
-        const traverseDiag = (rMag:1|-1, cMag:1|-1) => {
-          row = i + rMag;
-          col = j + cMag;
-          while(isInBounds(row, col) && (board[row][col] === opponentSide)) {
-            row += rMag;
-            col += cMag;
-          }
-          if(board[row][col] === EMPTY && col !== j + cMag && row !== i + rMag) newMoves.add(`${row}-${col}`);
-        }
-        traverseDiag(UP, RIGHT);
-        traverseDiag(UP, LEFT);
-        traverseDiag(DOWN, LEFT);
-        traverseDiag(DOWN, RIGHT);
+        traverseAll(i, j, EMPTY, addFunc);
       }
     }
     setAvailableMovesIdxs(newMoves);
@@ -85,6 +107,8 @@ export default function Game() {
   const playMove = (rIdx:number, cellIdx:number) => {
     setBoard((prev:Board) => {
       prev[rIdx][cellIdx] = mySide;
+      traverseAll(rIdx, cellIdx, mySide, prev);
+      checkMoves();
       return [...prev];
     })
   } 
