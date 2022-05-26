@@ -2,7 +2,6 @@ package game
 
 import (
 	"encoding/json"
-	"fmt"
 	"othelloServer/game/player"
 )
 
@@ -14,9 +13,11 @@ type moveDetails struct {
 func (g *gameStruct) listenSocketEventsFor(p player.Player) {
 	p.On("game-state", func(b []byte) {
 		res, _ := json.Marshal(struct {
-			Board   board `json:"board"`
-			CurTurn rune  `json:"curTurn"`
-		}{g.board, g.curTurnRune})
+			Board       board `json:"board"`
+			CurTurn     rune  `json:"curTurn"`
+			BlackPoints int   `json:"blackPoints"`
+			WhitePoints int   `json:"whitePoints"`
+		}{g.board, g.curTurnRune, g.board.getPointsFor(BLACK), g.board.getPointsFor(WHITE)})
 
 		p.Emit("game-state-res", string(res))
 	})
@@ -36,14 +37,12 @@ func (g *gameStruct) listenSocketEventsFor(p player.Player) {
 				if g.isGameOver() {
 					g.Broadcast("game-over", "")
 					g.gameOver()
-					fmt.Println("gmae obveer")
 					return
 				}
 				g.changeTurn()
 				if !g.curPlayer().hasPossibleMoves {
 					g.changeTurn()
 				}
-				fmt.Println(string(g.curTurnRune))
 				g.curPlayer().Emit("cur-turn", "")
 			}
 		}

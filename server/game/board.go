@@ -93,3 +93,14 @@ func (b *board) hasPossibleMoves(mySide, opponentSide rune) bool {
 	}
 	return false
 }
+
+func (b *board) getPointsFor(s rune) (p int) {
+	for _, row := range b {
+		for _, cell := range row {
+			if cell == s {
+				p++
+			}
+		}
+	}
+	return
+}

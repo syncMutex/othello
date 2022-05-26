@@ -8,20 +8,78 @@
   position: relative;
 }
 
+.points-table{
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  font-family: monospace;
+  font-weight: 900;
+
+  > div{
+    font-size: 3rem;
+    margin: 0 8rem;
+
+    &.white-points{
+      color: white;
+    }
+    text-shadow: 0 0 2px rgb(173, 254, 255);
+  }
+}
+
+.cur-turn{
+  text-align: center;
+  font-family: monospace;
+  font-size: 2rem;
+  color: white;
+  margin-top: 1rem;
+}
+
+.board-container{
+  display: flex;
+  justify-content: center;
+}
+
 .board{
   display: flex;
   flex-direction: column;
   pointer-events: none;
+  overflow: auto;
+  width: max-content;
+  position: relative;
+
+  .game-over{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    z-index: 10;
+    font-size: 3rem;
+    font-weight: 600;
+    animation: 0.5s fadin forwards;
+    pointer-events: all;
+
+    > div:first-child{
+      margin-bottom: 2rem;
+    }
+  }
+
   .row{
     display: flex;
     flex-direction: row;
-    margin-bottom: 0.1rem;
+    margin: 0.05rem 0;
     width: 100%;
 
     > div{
-      margin-left: 0.1rem;
-      width: 3rem;
-      height: 3rem;
+      margin: 0 0.05rem;
+      min-width: 3rem;
+      min-height: 3rem;
       background-color: rgb(35, 153, 35);
       display: flex;
       justify-content: center;
@@ -53,6 +111,7 @@
         border-radius: 5rem;
         position: absolute;
         backface-visibility: hidden;
+        transition: transform 1s;
       }
       &::before{
         background-color: white;
@@ -90,5 +149,33 @@
   100%{
     opacity: 0.4;
     transform: scale(1, 1);
+  }
+}
+
+@keyframes fadein {
+  from{
+    opacity: 0;
+  }
+  to{
+    opacity: 1;
+  }
+}
+
+@media (max-width: 500px) {
+  .board{
+    .row{
+      > div{
+        min-width: 2.5rem;
+        min-height: 2.5rem;
+      }
+    }
+  }
+
+  .points-table{
+    justify-content: space-between;
+    padding: 0 8%;
+    > div {
+      margin: 0;
+    }
   }
 }

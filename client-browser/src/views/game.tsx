@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { SocketContext } from "../contexts/socket";
 import { useForceUpdate } from "../hooks/utils";
 import "./game.scss";
@@ -37,14 +38,18 @@ export default function Game() {
   const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
+  const [blackPoints, setBlackPoints] = useState<number>(0);
+  const [whitePoints, setWhitePoints] = useState<number>(0);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--ghost-color", (mySide === BLACK) ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)"
     );
     socket.emit("game-state");
-    socket.on("game-state-res", (game:{board:Board, curTurn:number}) => {
+    socket.on("game-state-res", (game:{board:Board, curTurn:number, blackPoints:number, whitePoints:number}) => {
       setBoard(game.board);
+      setBlackPoints(game.blackPoints);
+      setWhitePoints(game.whitePoints);
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
     socket.on("cur-turn", () => {
@@ -65,7 +70,7 @@ export default function Game() {
     vDir:Dir, hDir:Dir,
     mySide:CellType, opponentSide:Side,
     funcOrBoard:EndPosCallback|Board|null,
-  ):boolean => {
+  ):[boolean, number] => {
     let row = initRow + vDir;
     let col = initCol + hDir;
     let b:Board = (funcOrBoard !== null && typeof funcOrBoard !== "function") ? funcOrBoard : board.current;
@@ -80,12 +85,11 @@ export default function Game() {
     }
 
     if(b[row][col] === mySide && (col !== initCol + hDir || row !== initRow + vDir)) {
-      if(funcOrBoard === null) return true;
+      if(funcOrBoard === null) return [false, 0];
       if(typeof funcOrBoard === "function") funcOrBoard(row, col);
-      else flipFrom(funcOrBoard, initRow, initCol, vDir, hDir, mySide as Side, opponentSide);
-      return true;
+      else return [true, flipFrom(funcOrBoard, initRow, initCol, vDir, hDir, mySide as Side, opponentSide)];
     }
-    return false;
+    return [false, 0];
   }
 
   const flipFrom = (
@@ -96,21 +100,30 @@ export default function Game() {
   ) => {
     let row = initRow + vDir;
     let col = initCol + hDir;
+    let flipped = 0;
     while(isInBounds(row, col, toFlipBoard.length, toFlipBoard[0].length) && (toFlipBoard[row][col] === opponentSide)) {
       toFlipBoard[row][col] = mySide;
       row += vDir;
       col += hDir;
+      flipped++;
     }
+    return flipped;
   }
 
-  const traverseAll = (i:number, j:number, ct:CellType, funcOrBoard:EndPosCallback|Board) => {
+  const traverseAll = (i:number, j:number, ct:CellType, funcOrBoard:EndPosCallback|Board):[boolean,number] => {
     let opponentSide:Side;
     if(ct === EMPTY) opponentSide = mySide === BLACK ? WHITE : BLACK;
     else opponentSide = ct === BLACK ? WHITE : BLACK;
-    let ret:boolean = false;
-    for(let [vertic, horiz] of TRAV_ARR)
-      ret = traverseFrom(i, j, vertic as Dir, horiz as Dir, ct, opponentSide, funcOrBoard) || ret;
-    return ret;
+    let hasFlipped:boolean=false, isF:boolean;
+    let flippedCount:number = 0, flC:number;
+    for(let [vertic, horiz] of TRAV_ARR) {
+      [isF, flC] = traverseFrom(
+        i, j, vertic as Dir, horiz as Dir, ct, opponentSide, funcOrBoard
+      );
+      flippedCount += flC;
+      hasFlipped = isF || hasFlipped;
+    }
+    return [hasFlipped, flippedCount];
   }
 
   const checkMoves = () => {
@@ -144,36 +157,58 @@ export default function Game() {
     if(!availableMovesIdxs.has(`${rIdx}-${cIdx}`) && mySide === _mySide) return false;
     let prev:Board = board.current.map((r:Array<number>) => [...r]);
     prev[rIdx][cIdx] = _mySide;
-    let hasFlipped = traverseAll(rIdx, cIdx, _mySide, prev);
+    const [hasFlipped, flipCount] = traverseAll(rIdx, cIdx, _mySide, prev);
     if(!hasFlipped) prev[rIdx][cIdx] = EMPTY;
+    if(flipCount) {
+      if(_mySide === BLACK) {
+        setBlackPoints((prev:number) => prev + 1 + flipCount);
+        setWhitePoints((prev:number) => prev - flipCount);
+      } else {
+        setWhitePoints((prev:number) => prev + 1 + flipCount);
+        setBlackPoints((prev:number) => prev - flipCount);
+      }
+    }
     setBoard(prev);
     return hasFlipped;
   } 
 
   return (<div className="game-page">
-    <div style={{ color: "white" }}>{isCurTurn ? String.fromCharCode(mySide) : String.fromCharCode(opponentSide)}</div>
-    <div style={{ color: "white" }}>{isGameOver && "game over"}</div>
-    <div className={`board${isCurTurn ? " enabled" : ""}`}>
-      {board.current?.map((row:Array<number>, rIdx:number) =>
-        <div key={rIdx} className="row">
-          {row.map((rune:number, cellIdx:number) => (
-            <div
-              onClick={() => {
-                if(playMove(rIdx, cellIdx, mySide)) {
-                  setIsCurTurn(false);
-                  socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
-                }
-              }}
-              key={cellIdx}
-              className={`color-${rune}${availableMovesIdxs.has(`${rIdx}-${cellIdx}`) ? " available" : ""}`}
-            >
-              {isDebug && <span style={{ position:'absolute', color: "aqua", top: 0, left: 0, zIndex: 10, pointerEvents: "none" }}>
-                {`${rIdx}-${cellIdx}`}
-              </span>}
+    <section className="board-section">
+      <div className="points-table">
+        <div className="black-points">{blackPoints}</div>
+        <div className="white-points">{whitePoints}</div>
+      </div>
+      <div className="board-container">
+        <div className={`board${isCurTurn ? " enabled" : ""}`}>
+          {isGameOver && <div className="game-over">
+            <div>Game over</div>
+            <Link to="/" className="link-btn btn-nobg" data-theme="dark">home page</Link>
+          </div>}
+          {board.current?.map((row:Array<number>, rIdx:number) =>
+            <div key={rIdx} className="row">
+              {row.map((rune:number, cellIdx:number) => (
+                <div
+                  onClick={() => {
+                    if(playMove(rIdx, cellIdx, mySide)) {
+                      setIsCurTurn(false);
+                      socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
+                    }
+                  }}
+                  key={cellIdx}
+                  className={`color-${rune}${availableMovesIdxs.has(`${rIdx}-${cellIdx}`) ? " available" : ""}`}
+                >
+                  {isDebug && <span style={{ position:'absolute', color: "aqua", top: 0, left: 0, zIndex: 10, pointerEvents: "none" }}>
+                    {`${rIdx}-${cellIdx}`}
+                  </span>}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
-    </div>
+      </div>
+      {!isGameOver && <div className="cur-turn">
+        {isCurTurn ? "Your turn" : (opponentSide === BLACK ? "Black" : "White") + "'s turn"}
+      </div>}
+    </section>
   </div>)
 }

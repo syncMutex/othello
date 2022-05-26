@@ -65,7 +65,7 @@ func NewGame() Game {
 		blackSide:          newPlayerSide(RandomString(), BLACK),
 		whiteSide:          newPlayerSide(RandomString(), WHITE),
 		gameState:          GAME_NOT_STARTED,
-		curTurnRune:        WHITE,
+		curTurnRune:        BLACK,
 	}
 }
 
