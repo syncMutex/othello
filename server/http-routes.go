@@ -107,7 +107,9 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		p.Disconnect()
 	}
 
-	if g.IsGameIdle() {
+	if g.IsGameOver() {
+		game.GamesMap.DeleteGame(gameId)
+	} else if g.IsGameIdle() {
 		game.GamesMap.GameSelfDestructOnIdle(gameId, time.Second*10)
 	}
 	s.Close()

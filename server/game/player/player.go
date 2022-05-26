@@ -23,7 +23,7 @@ type Player interface {
 	PlayerId() string
 	PlayerName() string
 	Side() rune
-	Opponent() rune
+	OpponentRune() rune
 }
 
 func NewPlayer(id string, side rune) Player {
@@ -50,6 +50,9 @@ func (p *playerStruct) ReConnect(s socket.Socket) {
 }
 
 func (p *playerStruct) Disconnect() {
+	if p.Socket != nil {
+		p.Socket.Close()
+	}
 	p.Socket = nil
 }
 
@@ -69,7 +72,7 @@ func (p *playerStruct) Side() rune {
 	return p.side
 }
 
-func (p *playerStruct) Opponent() rune {
+func (p *playerStruct) OpponentRune() rune {
 	if p.side == 'w' {
 		return 'b'
 	} else {

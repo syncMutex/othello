@@ -11,6 +11,16 @@ const EMPTY = 0;
 const isDebug = false;
 
 const LEFT = -1, RIGHT = 1, UP = -1, DOWN = 1, FIX = 0;
+const TRAV_ARR = [
+  [UP, FIX],
+  [DOWN, FIX],
+  [FIX, LEFT],
+  [FIX, RIGHT],
+  [UP, RIGHT],
+  [UP, LEFT],
+  [DOWN, LEFT],
+  [DOWN, RIGHT],
+];
 
 type Dir = 1|-1|0;
 type EndPosCallback = (rIdx:number, cIdx:number) => void;
@@ -26,6 +36,7 @@ export default function Game() {
   const mySide = sessionStorage.side?.charCodeAt(0);
   const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
+  const [isGameOver, setIsGameOver] = useState<boolean>(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -36,9 +47,14 @@ export default function Game() {
       setBoard(game.board);
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
+    socket.on("cur-turn", () => {
+      setIsCurTurn(true);
+    })
+    socket.on("game-over", () => {
+      setIsGameOver(true);
+    })
     socket.on("opponent-move", ({ rowIdx, colIdx }:{ rowIdx:number, colIdx:number }) => {
       playMove(rowIdx, colIdx, opponentSide);
-      setIsCurTurn(true);
     })
   }, []);
 
@@ -59,10 +75,8 @@ export default function Game() {
       col += hDir;
     }
     if(!isInBounds(row, col, rl, cl)) {
-      if(row < 0) row = 0;
-      if(col < 0) col = 0;
-      if(row >= rl) row = rl - 1;
-      if(col >= cl) col = cl - 1;
+      row += vDir * -1;
+      col += hDir * -1;
     }
 
     if(b[row][col] === mySide && (col !== initCol + hDir || row !== initRow + vDir)) {
@@ -93,14 +107,9 @@ export default function Game() {
     let opponentSide:Side;
     if(ct === EMPTY) opponentSide = mySide === BLACK ? WHITE : BLACK;
     else opponentSide = ct === BLACK ? WHITE : BLACK;
-    let ret:boolean = traverseFrom(i, j, UP, FIX, ct, opponentSide, funcOrBoard);
-    ret = traverseFrom(i, j, DOWN, FIX, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, FIX, LEFT, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, FIX, RIGHT, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, UP, RIGHT, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, UP, LEFT, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, DOWN, LEFT, ct, opponentSide, funcOrBoard) || ret;
-    ret = traverseFrom(i, j, DOWN, RIGHT, ct, opponentSide, funcOrBoard) || ret;
+    let ret:boolean = false;
+    for(let [vertic, horiz] of TRAV_ARR)
+      ret = traverseFrom(i, j, vertic as Dir, horiz as Dir, ct, opponentSide, funcOrBoard) || ret;
     return ret;
   }
 
@@ -111,10 +120,7 @@ export default function Game() {
     for(let i = 0; i < board.current.length; i++) {
       for(let j = 0; j < board.current[i].length; j++) {
         let cell = board.current[i][j];
-        if(
-          (cell !== mySide) || 
-          (i - 1 < 0)
-        ) continue;
+        if(cell !== mySide) continue;
         traverseAll(i, j, EMPTY, addFunc);
       }
     }
@@ -123,16 +129,30 @@ export default function Game() {
 
   useEffect(() => { setAvailableMovesIdxs(new Set()); isCurTurn && checkMoves() }, [isCurTurn])
 
-  const playMove = (rIdx:number, cIdx:number, mySide:Side):boolean => {
+  // random autoplay
+  /* useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
+    let a = [...availableMovesIdxs];
+    let t = a[Math.floor(Math.random()*a.length)].split("-");
+    let rIdx = +t[0], cellIdx = +t[1];
+    if(playMove(rIdx, cellIdx, mySide)) {
+      setIsCurTurn(false);
+      socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
+    }
+  }, 200) }, [availableMovesIdxs]) */
+
+  const playMove = (rIdx:number, cIdx:number, _mySide:Side):boolean => {
+    if(!availableMovesIdxs.has(`${rIdx}-${cIdx}`) && mySide === _mySide) return false;
     let prev:Board = board.current.map((r:Array<number>) => [...r]);
-    prev[rIdx][cIdx] = mySide;
-    let hasFlipped = traverseAll(rIdx, cIdx, mySide, prev);
+    prev[rIdx][cIdx] = _mySide;
+    let hasFlipped = traverseAll(rIdx, cIdx, _mySide, prev);
     if(!hasFlipped) prev[rIdx][cIdx] = EMPTY;
     setBoard(prev);
     return hasFlipped;
   } 
 
   return (<div className="game-page">
+    <div style={{ color: "white" }}>{isCurTurn ? String.fromCharCode(mySide) : String.fromCharCode(opponentSide)}</div>
+    <div style={{ color: "white" }}>{isGameOver && "game over"}</div>
     <div className={`board${isCurTurn ? " enabled" : ""}`}>
       {board.current?.map((row:Array<number>, rIdx:number) =>
         <div key={rIdx} className="row">

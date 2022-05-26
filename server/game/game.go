@@ -10,11 +10,16 @@ import (
 	"othelloServer/socket"
 )
 
+type playerSide struct {
+	player.Player
+	hasPossibleMoves bool
+}
+
 type gameStruct struct {
 	board              board
-	blackSide          player.Player
-	whiteSide          player.Player
-	curTurn            rune
+	blackSide          *playerSide
+	whiteSide          *playerSide
+	curTurnRune        rune
 	gameState          int
 	gameName           string
 	stopDestructChan   chan (struct{})
@@ -34,6 +39,7 @@ type Game interface {
 	IsGameIdle() bool
 	IsGameFull() bool
 	IsGameStarted() bool
+	IsGameOver() bool
 
 	Broadcast(string, string)
 	EmitWhite(string, string)
@@ -45,14 +51,21 @@ type Game interface {
 	GetLobbyInfoJson() string
 }
 
+func newPlayerSide(pId string, side rune) *playerSide {
+	return &playerSide{
+		Player:           player.NewPlayer(pId, side),
+		hasPossibleMoves: false,
+	}
+}
+
 func NewGame() Game {
 	return &gameStruct{
 		stopDestructChan:   make(chan struct{}),
 		isDestructChanOpen: true,
-		blackSide:          player.NewPlayer(RandomString(), BLACK),
-		whiteSide:          player.NewPlayer(RandomString(), WHITE),
+		blackSide:          newPlayerSide(RandomString(), BLACK),
+		whiteSide:          newPlayerSide(RandomString(), WHITE),
 		gameState:          GAME_NOT_STARTED,
-		curTurn:            BLACK,
+		curTurnRune:        WHITE,
 	}
 }
 
@@ -73,20 +86,28 @@ const (
 
 	WHITE = 'w'
 	BLACK = 'b'
+	EMPTY = 0
 )
 
 func (g *gameStruct) StartGame() {
 	g.gameState = GAME_STARTED
 	g.initBoard()
+	g.calcHasPossibleMoves()
 	g.listenSocketEventsFor(g.blackSide)
 	g.listenSocketEventsFor(g.whiteSide)
 }
 
 func (g *gameStruct) initBoard() {
-	g.board[3][3] = 'b'
-	g.board[3][4] = 'w'
-	g.board[4][3] = 'w'
-	g.board[4][4] = 'b'
+	g.board[3][3] = BLACK
+	g.board[3][4] = WHITE
+	g.board[4][3] = WHITE
+	g.board[4][4] = BLACK
+}
+
+func (g *gameStruct) gameOver() {
+	g.gameState = GAME_OVER
+	g.blackSide.Disconnect()
+	g.whiteSide.Disconnect()
 }
 
 func (g *gameStruct) Broadcast(evName, data string) {
@@ -107,11 +128,38 @@ func (g *gameStruct) EmitWhite(evName, data string) {
 }
 
 func (g *gameStruct) changeTurn() {
-	if g.curTurn == BLACK {
-		g.curTurn = WHITE
+	if g.curTurnRune == BLACK {
+		g.curTurnRune = WHITE
 	} else {
-		g.curTurn = BLACK
+		g.curTurnRune = BLACK
 	}
+}
+
+func (g *gameStruct) getOpponent() *playerSide {
+	if g.curTurnRune == BLACK {
+		return g.whiteSide
+	}
+	return g.blackSide
+}
+
+func (g *gameStruct) curPlayer() *playerSide {
+	if g.curTurnRune == BLACK {
+		return g.blackSide
+	}
+	return g.whiteSide
+}
+
+func (g *gameStruct) calcHasPossibleMoves() {
+	g.blackSide.hasPossibleMoves = g.board.hasPossibleMoves(BLACK, WHITE)
+	g.whiteSide.hasPossibleMoves = g.board.hasPossibleMoves(WHITE, BLACK)
+}
+
+func (g *gameStruct) isGameOver() bool {
+	return !g.blackSide.hasPossibleMoves && !g.whiteSide.hasPossibleMoves
+}
+
+func (g *gameStruct) IsGameOver() bool {
+	return g.gameState == GAME_OVER
 }
 
 func (g *gameStruct) GetLobbyInfoJson() string {
@@ -124,7 +172,7 @@ func (g *gameStruct) GetLobbyInfoJson() string {
 	return string(j)
 }
 
-func (g *gameStruct) SetPlayer(side string, p player.Player) {
+func (g *gameStruct) SetPlayer(side string, p *playerSide) {
 	if side == "black" {
 		g.blackSide = p
 	} else if side == "white" {

@@ -1,6 +1,8 @@
 package game
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type board [8][8]rune
 
@@ -11,6 +13,17 @@ const (
 	DOWN  = 1
 	FIX   = 0
 )
+
+var TRAV_ARR = [][2]int{
+	{UP, FIX},
+	{DOWN, FIX},
+	{FIX, LEFT},
+	{FIX, RIGHT},
+	{UP, RIGHT},
+	{UP, LEFT},
+	{DOWN, LEFT},
+	{DOWN, RIGHT},
+}
 
 func (b *board) JsonString() string {
 	bs, _ := json.Marshal(b)
@@ -31,21 +44,10 @@ func (b *board) traverseFrom(initRow, initCol, vDir, hDir int, mySide, opponentS
 		col += hDir
 	}
 	if !b.isInBounds(row, col, rl, cl) {
-		if row < 0 {
-			row = 0
-		}
-		if col < 0 {
-			col = 0
-		}
-		if row >= rl {
-			row = rl - 1
-		}
-		if col >= cl {
-			col = cl - 1
-		}
+		row += vDir * -1
+		col += hDir * -1
 	}
 	if b[row][col] == mySide && (col != initCol+hDir || row != initRow+vDir) {
-		b.flipFrom(initRow, initCol, vDir, hDir, opponentSide, mySide)
 		return true
 	}
 	return false
@@ -63,16 +65,31 @@ func (b *board) flipFrom(initRow, initCol, vDir, hDir int, flipFrom, flipTo rune
 }
 
 func (b *board) traverseAndFlip(i, j int, mySide, opponentSide rune) (isFlipped bool) {
-	isFlipped = b.traverseFrom(i, j, UP, FIX, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, DOWN, FIX, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, FIX, LEFT, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, FIX, RIGHT, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, UP, RIGHT, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, UP, LEFT, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, DOWN, LEFT, mySide, opponentSide) || isFlipped
-	isFlipped = b.traverseFrom(i, j, DOWN, RIGHT, mySide, opponentSide) || isFlipped
+	for _, d := range TRAV_ARR {
+		f := b.traverseFrom(i, j, d[0], d[1], mySide, opponentSide)
+		if f {
+			b.flipFrom(i, j, d[0], d[1], opponentSide, mySide)
+		}
+		isFlipped = f || isFlipped
+	}
 	if isFlipped {
 		b[i][j] = mySide
 	}
 	return
+}
+
+func (b *board) hasPossibleMoves(mySide, opponentSide rune) bool {
+	for i := range b {
+		for j := range b[i] {
+			if b[i][j] != mySide {
+				continue
+			}
+			for _, d := range TRAV_ARR {
+				if b.traverseFrom(i, j, d[0], d[1], 0, opponentSide) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
