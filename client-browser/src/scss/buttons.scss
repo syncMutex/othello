@@ -1,5 +1,6 @@
 .btn-green,
 .btn-red,
+.btn-blue,
 .btn-nobg{
   min-width: 2rem;
   min-height: 2rem;
@@ -54,6 +55,21 @@
 
   &:active{
     background-color: rgb(199, 45, 45);
+    color: white;
+  }
+}
+
+.btn-blue{
+  background-color: rgb(44, 44, 255);
+  color: white;
+
+  &:hover{
+    background-color: rgb(17, 17, 255);
+    color: white;
+  }
+
+  &:active{
+    background-color: rgb(4, 4, 200);
     color: white;
   }
 }
