@@ -1,10 +1,12 @@
 import "./lobby.scss";
 import { MouseEvent, useContext, useEffect, useState } from "react"
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
 import { useLoadingScreen } from "../hooks/ui";
 import { useCopyToClipboard, useEffectAbortControlled } from "../hooks/utils";
+import { sessionStorageGetMySide, sessionStorageSetMySide, sessionStorageSetPlayerId, sessionStorageSetSideNames } from "../ts/session-storage";
+import { Side } from "../ts/common.types";
 
 
 function Invite({ link }:{ link:string }) {
@@ -32,12 +34,11 @@ export default function Lobby() {
   const [playerName] = usePlayerName();
   const socket = useContext(SocketContext);
   const { gameId } = useParams();
-  const state = useLocation() as any;
   const navigate = useNavigate();
   const [RenderIsLoading, setIsLoading] = useLoadingScreen("Loading", true);
   const [blackSideName, setBlackSideName] = useState<string>("");
   const [whiteSideName, setWhiteSideName] = useState<string>("");
-  const side = state.side || sessionStorage.side;
+  const side = sessionStorageGetMySide();
   const [lobbyMsg, setLobbyMsg] = useState<string>("");
   const [errMsg, setErrMsg] = useState<string>("");
 
@@ -78,18 +79,20 @@ export default function Lobby() {
         navigate("/")
     })
 
-    socket.on("join-player-info-res", (data:{ playerId:string, side:string, err:boolean, msg:string }) => {
+    socket.on("join-player-info-res", (data:{ playerId:string, side:Side, err:boolean, msg:string }) => {
       if(data.err) return setErrMsg(data.msg);
       if(data.side === "black") setBlackSideName(playerName);
       else setWhiteSideName(playerName);
-      sessionStorage.side = data.side
+      sessionStorageSetMySide(data.side);
+      sessionStorageSetPlayerId(data.playerId);
       setIsLoading(false);
-      setLobbyMsg("waiting for your opponent...")
+      setLobbyMsg("waiting for your opponent...");
     })
 
     socket.on("lobby-info", (lobby:{ black:string, white:string }={black: "", white: ""}) => {
       setBlackSideName(lobby.black);
       setWhiteSideName(lobby.white);
+      sessionStorageSetSideNames(lobby.black, lobby.white);
     })
 
     socket.on("countdown-begin", () => {
@@ -99,7 +102,7 @@ export default function Lobby() {
           setLobbyMsg(`Game will start in ${countdownVal}`);
         else {
           clearInterval(int);
-          navigate(`/game/${gameId}`)
+          navigate(`/game/${gameId}`);
         }
       }, 1000)
     })

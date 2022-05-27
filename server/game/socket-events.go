@@ -26,13 +26,17 @@ func (g *gameStruct) listenSocketEventsFor(p player.Player) {
 		p.Emit("cur-turn-res", string(g.curTurnRune))
 	})
 
+	p.On("chat-msg", func(b []byte) {
+		g.getOpponentOf(p.Side()).Emit("chat-msg", string(b))
+	})
+
 	p.On("move", func(b []byte) {
 		var md moveDetails
 		json.Unmarshal(b, &md)
 
 		if g.curTurnRune == p.Side() {
 			if isFlipped := g.board.traverseAndFlip(md.RIdx, md.CIdx, p.Side(), p.OpponentRune()); isFlipped {
-				g.getOpponent().Emit("opponent-move", string(b))
+				g.getCurOpponent().Emit("opponent-move", string(b))
 				g.calcHasPossibleMoves()
 				if g.isGameOver() {
 					g.Broadcast("game-over", "")

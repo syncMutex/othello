@@ -2,8 +2,8 @@ import "./create-game.scss"
 import { usePlayerName } from "../hooks/player-name"
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-type Side = "black" | "white";
+import { sessionStorageSetMySide } from "../ts/session-storage";
+import { Side } from "../ts/common.types";
 
 export default function CreateGame() { 
   const [userName] = usePlayerName();
@@ -21,8 +21,8 @@ export default function CreateGame() {
     })
     const data = await res.json();
     if(data.err) return;
-    sessionStorage.side = curSide;
-    navigate(`/lobby/${data.gameId}`, { state: { side: curSide } });
+    sessionStorageSetMySide(curSide);
+    navigate(`/lobby/${data.gameId}`);
   }
 
   return (<div className="create-game-page">

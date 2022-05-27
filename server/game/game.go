@@ -135,8 +135,12 @@ func (g *gameStruct) changeTurn() {
 	}
 }
 
-func (g *gameStruct) getOpponent() *playerSide {
-	if g.curTurnRune == BLACK {
+func (g *gameStruct) getCurOpponent() *playerSide {
+	return g.getOpponentOf(g.curTurnRune)
+}
+
+func (g *gameStruct) getOpponentOf(side rune) *playerSide {
+	if side == BLACK {
 		return g.whiteSide
 	}
 	return g.blackSide
