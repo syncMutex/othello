@@ -58,5 +58,9 @@ export class Socket{
     })
     this.conn?.send(res)
   }
-}
 
+  close() {
+    this.conn?.close();
+    this.conn = null;
+  }
+}

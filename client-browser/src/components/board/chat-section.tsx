@@ -24,7 +24,7 @@ class ChatMsg {
 type Chats = Array<ChatMsg>;
 
 export default function ChatSection({ socket, opponentName }:ChatSectionProps) {
-  const [isChatSectionOpen, setIsChatSectionOpen] = useState<boolean>(true);
+  const [isChatSectionOpen, setIsChatSectionOpen] = useState<boolean>(false);
   const [chats, setChats] = useState<Chats>([]);
   const [inputMsg, setInputMsg] = useState<string>("");
   const chatMsgsDiv = useRef<HTMLDivElement>(null);

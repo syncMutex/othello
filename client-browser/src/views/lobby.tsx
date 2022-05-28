@@ -43,9 +43,10 @@ export default function Lobby() {
   const [errMsg, setErrMsg] = useState<string>("");
 
   useEffectAbortControlled(async (c:AbortController) => {
+    window.history.replaceState({}, document.title);
     const canReconnect = SessionStorage.playerId != null;
     try {
-      const res = await fetch(`http://${location.hostname}:5000/api/game-info/${gameId}`, {
+      const res = await fetch(`http://${window.location.hostname}:5000/api/game-info/${gameId}`, {
         method: "GET",
         signal: c.signal
       });

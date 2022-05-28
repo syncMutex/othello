@@ -30,6 +30,11 @@ func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 		g.getOpponentOf(p.Side()).Emit("chat-msg", string(b))
 	})
 
+	p.On("resign-game", func(b []byte) {
+		g.getOpponentOf(p.Side()).Emit("opponent-resign", "")
+		g.gameOver()
+	})
+
 	p.On("move", func(b []byte) {
 		var md moveDetails
 		json.Unmarshal(b, &md)

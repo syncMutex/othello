@@ -42,8 +42,9 @@ export default function BoardSection({ socket }:BoardSectionProps) {
   const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
-  const [blackPoints, setBlackPoints] = useState<number>(0);
-  const [whitePoints, setWhitePoints] = useState<number>(0);
+  const blackPoints = useRef<number>(0);
+  const whitePoints = useRef<number>(0);
+  const [gameOverMsg, setGameOverMsg] = useState<string>("");
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -55,8 +56,8 @@ export default function BoardSection({ socket }:BoardSectionProps) {
     socket.emit("game-state");
     socket.on("game-state-res", (game:{board:Board, curTurn:number, blackPoints:number, whitePoints:number}) => {
       setBoard(game.board);
-      setBlackPoints(game.blackPoints);
-      setWhitePoints(game.whitePoints);
+      blackPoints.current = game.blackPoints;
+      whitePoints.current = game.whitePoints;
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
     socket.on("cur-turn", () => {
@@ -64,6 +65,17 @@ export default function BoardSection({ socket }:BoardSectionProps) {
     })
     socket.on("game-over", () => {
       setIsGameOver(true);
+      if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
+      else {
+        if(mySide === BLACK) setGameOverMsg(whitePoints.current < blackPoints.current ? "You won :)" : "You lost :(");
+        else setGameOverMsg(whitePoints.current > blackPoints.current ? "You won :)" : "You lost :(");
+      }
+      SessionStorage.reset();
+    })
+    socket.on("opponent-resign", () => {
+      setIsGameOver(true);
+      setGameOverMsg("opponent resigned.");
+      SessionStorage.reset();
     })
     socket.on("opponent-move", ({ rowIdx, colIdx }:{ rowIdx:number, colIdx:number }) => {
       playMove(rowIdx, colIdx, opponentSide);
@@ -150,7 +162,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
   useEffect(() => { setAvailableMovesIdxs(new Set()); isCurTurn && checkMoves() }, [isCurTurn])
 
   // random autoplay
-  /* useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
+  useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
     let a = [...availableMovesIdxs];
     let t = a[Math.floor(Math.random()*a.length)].split("-");
     let rIdx = +t[0], cellIdx = +t[1];
@@ -158,7 +170,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
       setIsCurTurn(false);
       socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
     }
-  }, 200) }, [availableMovesIdxs]) */
+  }, 200) }, [availableMovesIdxs])
 
   const playMove = (rIdx:number, cIdx:number, _mySide:Side):boolean => {
     if(!availableMovesIdxs.has(`${rIdx}-${cIdx}`) && mySide === _mySide) return false;
@@ -168,11 +180,11 @@ export default function BoardSection({ socket }:BoardSectionProps) {
     if(!hasFlipped) prev[rIdx][cIdx] = EMPTY;
     if(flipCount) {
       if(_mySide === BLACK) {
-        setBlackPoints((prev:number) => prev + 1 + flipCount);
-        setWhitePoints((prev:number) => prev - flipCount);
+        blackPoints.current += 1 + flipCount;
+        whitePoints.current -= flipCount;
       } else {
-        setWhitePoints((prev:number) => prev + 1 + flipCount);
-        setBlackPoints((prev:number) => prev - flipCount);
+        whitePoints.current += 1 + flipCount;
+        blackPoints.current -= flipCount;
       }
     }
     setBoard(prev);
@@ -183,13 +195,14 @@ export default function BoardSection({ socket }:BoardSectionProps) {
       {isCurTurn ? "Your turn" : (opponentSide === BLACK ? "Black" : "White") + "'s turn"}
     </div>}
     <div className="points-table">
-      <div className="black-points">{blackPoints}</div>
-      <div className="white-points">{whitePoints}</div>
+      <div className="black-points">{blackPoints.current}</div>
+      <div className="white-points">{whitePoints.current}</div>
     </div>
     <div className="board-container">
       <div className={`board${isCurTurn ? " enabled" : ""}`}>
         {isGameOver && <div className="game-over">
           <div>Game over</div>
+          <div style={{ fontSize: "1.5rem" }}>{gameOverMsg}</div>
           <Link to="/" className="link-btn btn-nobg" data-theme="dark">home page</Link>
         </div>}
         {board.current?.map((row:Array<number>, rIdx:number) =>

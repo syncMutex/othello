@@ -67,7 +67,7 @@
     animation: 0.5s fadin forwards;
     pointer-events: all;
 
-    > div:first-child{
+    > div:nth-child(1), div:nth-child(2){
       margin-bottom: 2rem;
     }
   }
