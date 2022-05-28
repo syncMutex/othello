@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForceUpdate } from "../../hooks/utils";
 import { Link } from "react-router-dom";
 import { Socket } from "../../ts/socket-impl";
-import { sessionStorageGetMySide } from "../../ts/session-storage";
+import { SessionStorage } from "../../ts/session-storage";
 
 type Board = Array<Array<number>>
 
@@ -38,7 +38,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
   const board = useRef<Board>([[]]);
   const setBoard = (newBoard:Board) => { board.current = newBoard; forceUpdate() };
   const [isCurTurn, setIsCurTurn] = useState<boolean>(false);
-  const mySide = sessionStorageGetMySide().charCodeAt(0) as Side;
+  const mySide = SessionStorage.mySide?.charCodeAt(0) as Side;
   const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState<boolean>(false);

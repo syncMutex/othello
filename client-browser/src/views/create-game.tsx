@@ -2,12 +2,12 @@ import "./create-game.scss"
 import { usePlayerName } from "../hooks/player-name"
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { sessionStorageSetMySide } from "../ts/session-storage";
 import { Side } from "../ts/common.types";
+import { SessionStorage } from "../ts/session-storage";
 
 export default function CreateGame() { 
   const [userName] = usePlayerName();
-  const [curSide, setCurSide] = useState<Side>("black")
+  const [curSide, setCurSide] = useState<Side>("black");
   const navigate = useNavigate();
 
   const createLobby = async () => {
@@ -21,7 +21,7 @@ export default function CreateGame() {
     })
     const data = await res.json();
     if(data.err) return;
-    sessionStorageSetMySide(curSide);
+    SessionStorage.mySide = curSide;
     navigate(`/lobby/${data.gameId}`);
   }
 

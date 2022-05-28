@@ -1,27 +1,88 @@
 import { Side } from "./common.types";
 
-export function sessionStorageSetMySide(side:Side) {
-  sessionStorage.mySide = side;
+type SSValue = string | null;
+
+export class PlayerNamesObj {
+  blackSideName: SSValue = sessionStorage.getItem("blackSideName");
+  whiteSideName: SSValue = sessionStorage.getItem("whiteSideName");
+
+  constructor(blackSideName:SSValue, whiteSideName:SSValue) {
+    this.blackSideName = blackSideName;
+    this.whiteSideName = whiteSideName;
+    if(blackSideName === null) sessionStorage.removeItem("blackSideName");
+    else sessionStorage.setItem("blackSideName", blackSideName); 
+    if(whiteSideName === null) sessionStorage.removeItem("whiteSideName");
+    else sessionStorage.setItem("whiteSideName", whiteSideName);
+  }
 }
 
-export function sessionStorageGetMySide():Side{
-  return sessionStorage.mySide;
+class SessionStorageHandler {
+  private _mySide: SSValue = sessionStorage.getItem("mySide");
+  private _playerNames: PlayerNamesObj = new PlayerNamesObj(null, null);
+  private _playerId: SSValue = sessionStorage.getItem("playerId");
+  private _gameId: SSValue = sessionStorage.getItem("gameId");
+  private _opponentName: SSValue = sessionStorage.getItem("opponentName");
+
+  
+  public get mySide() : SSValue {
+    return this._mySide;
+  }
+  public set mySide(v : SSValue) {
+    this._mySide = v;
+    if(v === null) sessionStorage.removeItem("mySide");
+    else sessionStorage.setItem("mySide", v);
+  }
+  
+  public set playerNames(v : PlayerNamesObj) {
+    this._playerNames = v;
+    this.setOpponentName();
+  }
+  
+  private setOpponentName() {
+    if(this._mySide === "black") this.opponentName = this._playerNames.whiteSideName;
+    else this.opponentName = this._playerNames.blackSideName; 
+  }
+
+  
+  public get opponentName() : SSValue {
+    return this._opponentName;
+  }
+  
+
+  private set opponentName(v : SSValue) {
+    this._opponentName = v;
+    if(v === null) sessionStorage.removeItem("opponentName");
+    else sessionStorage.setItem("opponentName", v);
+  }
+  
+  public get playerId() : SSValue {
+    return this._playerId;
+  }
+  
+  public set playerId(v : SSValue) {
+    this._playerId = v;
+    if(v === null) sessionStorage.removeItem("playerId");
+    else sessionStorage.setItem("playerId", v);
+  }
+
+  public get gameId() : SSValue {
+    return this._gameId;
+  }
+  
+  public set gameId(v : SSValue) {
+    this._gameId = v;
+    if(v === null) sessionStorage.removeItem("gameId");
+    else sessionStorage.setItem("gameId", v);
+  }
+
+  reset() {
+    sessionStorage.clear();
+    this.gameId = null;
+    this.mySide = null;
+    this.opponentName = null;
+    this.playerId = null;
+    this.playerNames = new PlayerNamesObj(null, null);
+  }
 }
 
-export function sessionStorageSetSideNames(blackSideName:string, whiteSideName:string) {
-  sessionStorage.blackSideName = blackSideName;
-  sessionStorage.whiteSideName = whiteSideName;
-}
-
-export function sessionStorageSetPlayerId(playerId:string) {
-  sessionStorage.playerId = playerId;
-}
-
-export function sessionStorageGetPlayerId():string {
-  return sessionStorage.playerId;
-}
-
-export function sessionStorageGetOpponentName() {
-  if(sessionStorageGetMySide() === "black") return sessionStorage.whiteSideName;
-  return sessionStorage.blackSideName; 
-}
+export const SessionStorage = new SessionStorageHandler();

@@ -5,8 +5,8 @@ import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
 import { useLoadingScreen } from "../hooks/ui";
 import { useCopyToClipboard, useEffectAbortControlled } from "../hooks/utils";
-import { sessionStorageGetMySide, sessionStorageSetMySide, sessionStorageSetPlayerId, sessionStorageSetSideNames } from "../ts/session-storage";
 import { Side } from "../ts/common.types";
+import { PlayerNamesObj, SessionStorage } from "../ts/session-storage";
 
 
 function Invite({ link }:{ link:string }) {
@@ -33,12 +33,12 @@ function Invite({ link }:{ link:string }) {
 export default function Lobby() {
   const [playerName] = usePlayerName();
   const socket = useContext(SocketContext);
-  const { gameId } = useParams();
+  const { gameId } = useParams() as { gameId: string };
   const navigate = useNavigate();
   const [RenderIsLoading, setIsLoading] = useLoadingScreen("Loading", true);
   const [blackSideName, setBlackSideName] = useState<string>("");
   const [whiteSideName, setWhiteSideName] = useState<string>("");
-  const side = sessionStorageGetMySide();
+  const side = SessionStorage.mySide;
   const [lobbyMsg, setLobbyMsg] = useState<string>("");
   const [errMsg, setErrMsg] = useState<string>("");
 
@@ -83,8 +83,8 @@ export default function Lobby() {
       if(data.err) return setErrMsg(data.msg);
       if(data.side === "black") setBlackSideName(playerName);
       else setWhiteSideName(playerName);
-      sessionStorageSetMySide(data.side);
-      sessionStorageSetPlayerId(data.playerId);
+      SessionStorage.mySide = data.side;
+      SessionStorage.playerId = data.playerId;
       setIsLoading(false);
       setLobbyMsg("waiting for your opponent...");
     })
@@ -92,7 +92,8 @@ export default function Lobby() {
     socket.on("lobby-info", (lobby:{ black:string, white:string }={black: "", white: ""}) => {
       setBlackSideName(lobby.black);
       setWhiteSideName(lobby.white);
-      sessionStorageSetSideNames(lobby.black, lobby.white);
+      SessionStorage.playerNames = new PlayerNamesObj(lobby.black, lobby.white);
+      SessionStorage.gameId = gameId;
     })
 
     socket.on("countdown-begin", () => {
