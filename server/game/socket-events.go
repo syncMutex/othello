@@ -10,7 +10,7 @@ type moveDetails struct {
 	CIdx int `json:"colIdx"`
 }
 
-func (g *gameStruct) listenSocketEventsFor(p player.Player) {
+func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 	p.On("game-state", func(b []byte) {
 		res, _ := json.Marshal(struct {
 			Board       board `json:"board"`

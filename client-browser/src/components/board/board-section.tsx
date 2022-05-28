@@ -4,6 +4,7 @@ import { useForceUpdate } from "../../hooks/utils";
 import { Link } from "react-router-dom";
 import { Socket } from "../../ts/socket-impl";
 import { SessionStorage } from "../../ts/session-storage";
+import { Side } from "../../ts/common.types";
 
 type Board = Array<Array<number>>
 
@@ -27,7 +28,6 @@ const TRAV_ARR = [
 type Dir = 1|-1|0;
 type EndPosCallback = (rIdx:number, cIdx:number) => void;
 type CellType = typeof BLACK| typeof WHITE| typeof EMPTY;
-type Side = typeof BLACK| typeof WHITE;
 
 interface BoardSectionProps {
   socket: Socket;
@@ -38,7 +38,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
   const board = useRef<Board>([[]]);
   const setBoard = (newBoard:Board) => { board.current = newBoard; forceUpdate() };
   const [isCurTurn, setIsCurTurn] = useState<boolean>(false);
-  const mySide = SessionStorage.mySide?.charCodeAt(0) as Side;
+  const mySide = SessionStorage.mySide;
   const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState<boolean>(false);

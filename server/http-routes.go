@@ -23,7 +23,7 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 
 	var gameDetails struct {
 		HostName string `json:"hostName"`
-		HostSide string `json:"hostSide"`
+		HostSide rune   `json:"hostSide"`
 	}
 
 	err = json.Unmarshal(body, &gameDetails)
@@ -32,7 +32,7 @@ func createLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if gameDetails.HostName == "" || (gameDetails.HostSide != "black" && gameDetails.HostSide != "white") {
+	if gameDetails.HostName == "" || (gameDetails.HostSide != game.BLACK && gameDetails.HostSide != game.WHITE) {
 		respond.RespondErrMsg("invalid data.", w)
 		return
 	}
@@ -64,8 +64,10 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 
 	s.Once("join-player-info", func(b []byte) {
 		var pInfo struct {
-			Name string `json:"playerName"`
-			Side string `json:"side"`
+			Name        string `json:"playerName"`
+			Side        rune   `json:"side"`
+			IsReconnect bool   `json:"isReconnect"`
+			PlayerId    string `json:"playerId"`
 		}
 		err = json.Unmarshal(b, &pInfo)
 		if err != nil {
@@ -73,8 +75,26 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if pInfo.Side == "" {
-			if pInfo.Side = g.GetEmptySide(); pInfo.Side == "" {
+		if pInfo.IsReconnect {
+			playerId = pInfo.PlayerId
+			p := g.GetPlayerById(playerId)
+			if p == nil || p.Side() != pInfo.Side {
+				s.Close()
+				return
+			}
+			if p.IsConnected() {
+				s.Close()
+				return
+			}
+			p.ReConnect(s)
+			g.ListenSocketEventsFor(p)
+			p.Emit("lobby-info", g.GetLobbyInfoJson())
+			p.Emit("reconnect-success", "")
+			return
+		}
+
+		if pInfo.Side == 0 {
+			if pInfo.Side = g.GetEmptySide(); pInfo.Side == 0 {
 				s.EmitErr("join-player-info-res", "game full :(").Close()
 				return
 			}
@@ -89,7 +109,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		var playerInfo = struct {
 			respond.ResponseStruct
 			PlayerId string `json:"playerId"`
-			Side     string `json:"side"`
+			Side     rune   `json:"side"`
 		}{respond.ResponseStruct{Err: false, Msg: "success"}, playerId, pInfo.Side}
 		res, _ = json.Marshal(playerInfo)
 		s.Emit("join-player-info-res", string(res))

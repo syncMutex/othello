@@ -34,7 +34,8 @@ type Game interface {
 
 	StartGame()
 
-	JoinGame(name, side string, _ socket.Socket) (playerId string, _ error)
+	JoinGame(name string, side rune, _ socket.Socket) (playerId string, _ error)
+	ListenSocketEventsFor(player.Player)
 
 	IsGameIdle() bool
 	IsGameFull() bool
@@ -47,7 +48,7 @@ type Game interface {
 
 	GetGameName() string
 	GetPlayerById(string) player.Player
-	GetEmptySide() string
+	GetEmptySide() rune
 	GetLobbyInfoJson() string
 }
 
@@ -93,8 +94,8 @@ func (g *gameStruct) StartGame() {
 	g.gameState = GAME_STARTED
 	g.initBoard()
 	g.calcHasPossibleMoves()
-	g.listenSocketEventsFor(g.blackSide)
-	g.listenSocketEventsFor(g.whiteSide)
+	g.ListenSocketEventsFor(g.blackSide)
+	g.ListenSocketEventsFor(g.whiteSide)
 }
 
 func (g *gameStruct) initBoard() {
@@ -192,13 +193,13 @@ func (g *gameStruct) IsGameStarted() bool {
 	return g.gameState == GAME_STARTED
 }
 
-func (g *gameStruct) GetEmptySide() string {
+func (g *gameStruct) GetEmptySide() rune {
 	if !g.blackSide.IsReserved() {
-		return "black"
+		return BLACK
 	} else if !g.whiteSide.IsReserved() {
-		return "white"
+		return WHITE
 	}
-	return ""
+	return 0
 }
 
 func (g *gameStruct) GetPlayerById(pid string) player.Player {
@@ -224,16 +225,16 @@ func (g *gameStruct) IsGameIdle() bool {
 	return !g.blackSide.IsConnected() && !g.whiteSide.IsConnected()
 }
 
-func (g *gameStruct) JoinGame(name, side string, s socket.Socket) (playerId string, retErr error) {
+func (g *gameStruct) JoinGame(name string, side rune, s socket.Socket) (playerId string, retErr error) {
 	g.checkHost(name)
 	switch side {
-	case "black":
+	case BLACK:
 		if g.blackSide.IsReserved() {
 			return "", errors.New("black side already reserved.")
 		}
 		g.blackSide.Connect(s, name)
 		playerId = g.blackSide.PlayerId()
-	case "white":
+	case WHITE:
 		if g.whiteSide.IsReserved() {
 			return "", errors.New("black side already reserved.")
 		}

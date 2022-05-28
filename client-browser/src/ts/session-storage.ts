@@ -1,4 +1,4 @@
-import { Side } from "./common.types";
+import { BLACK, Side } from "./common.types";
 
 type SSValue = string | null;
 
@@ -17,20 +17,20 @@ export class PlayerNamesObj {
 }
 
 class SessionStorageHandler {
-  private _mySide: SSValue = sessionStorage.getItem("mySide");
+  private _mySide: Side | null = (+(sessionStorage.getItem("mySide") || 0) as Side);
   private _playerNames: PlayerNamesObj = new PlayerNamesObj(null, null);
   private _playerId: SSValue = sessionStorage.getItem("playerId");
   private _gameId: SSValue = sessionStorage.getItem("gameId");
   private _opponentName: SSValue = sessionStorage.getItem("opponentName");
 
   
-  public get mySide() : SSValue {
-    return this._mySide;
+  public get mySide() : Side {
+    return this._mySide || 0;
   }
-  public set mySide(v : SSValue) {
+  public set mySide(v : Side|null) {
     this._mySide = v;
     if(v === null) sessionStorage.removeItem("mySide");
-    else sessionStorage.setItem("mySide", v);
+    else sessionStorage.setItem("mySide", `${v}`);
   }
   
   public set playerNames(v : PlayerNamesObj) {
@@ -39,7 +39,7 @@ class SessionStorageHandler {
   }
   
   private setOpponentName() {
-    if(this._mySide === "black") this.opponentName = this._playerNames.whiteSideName;
+    if(this._mySide === BLACK) this.opponentName = this._playerNames.whiteSideName;
     else this.opponentName = this._playerNames.blackSideName; 
   }
 

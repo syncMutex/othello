@@ -2,12 +2,12 @@ import "./create-game.scss"
 import { usePlayerName } from "../hooks/player-name"
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Side } from "../ts/common.types";
+import { BLACK, Side, WHITE } from "../ts/common.types";
 import { SessionStorage } from "../ts/session-storage";
 
 export default function CreateGame() { 
   const [userName] = usePlayerName();
-  const [curSide, setCurSide] = useState<Side>("black");
+  const [curSide, setCurSide] = useState<Side>(BLACK);
   const navigate = useNavigate();
 
   const createLobby = async () => {
@@ -32,13 +32,13 @@ export default function CreateGame() {
         <span className="username">{userName}</span>'s game
       </div> 
       <div style={{ fontFamily: "monospace" }}>Choose your side</div>
-      <div className="sides" onChange={(e:React.ChangeEvent<HTMLInputElement>) => setCurSide(e.target.value as Side)}>
+      <div className="sides" onChange={(e:React.ChangeEvent<HTMLInputElement>) => setCurSide(+(e.target.value) as any)}>
         <label className="black-side">
-          <input type="radio" name="side" value="black" defaultChecked />
+          <input type="radio" name="side" value={BLACK} defaultChecked />
           <span className="checkmark"></span>
         </label>
         <label className="white-side">
-          <input type="radio" name="side" value="white" />
+          <input type="radio" name="side" value={WHITE} />
           <span className="checkmark"></span>
         </label>
       </div>

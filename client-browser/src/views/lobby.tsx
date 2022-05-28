@@ -1,11 +1,11 @@
 import "./lobby.scss";
-import { MouseEvent, useContext, useEffect, useState } from "react"
+import { MouseEvent, useContext, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { socketConnect, SocketContext } from "../contexts/socket"
 import { usePlayerName } from "../hooks/player-name";
 import { useLoadingScreen } from "../hooks/ui";
 import { useCopyToClipboard, useEffectAbortControlled } from "../hooks/utils";
-import { Side } from "../ts/common.types";
+import { BLACK, Side } from "../ts/common.types";
 import { PlayerNamesObj, SessionStorage } from "../ts/session-storage";
 
 
@@ -43,6 +43,7 @@ export default function Lobby() {
   const [errMsg, setErrMsg] = useState<string>("");
 
   useEffectAbortControlled(async (c:AbortController) => {
+    const canReconnect = SessionStorage.playerId != null;
     try {
       const res = await fetch(`http://${location.hostname}:5000/api/game-info/${gameId}`, {
         method: "GET",
@@ -54,7 +55,7 @@ export default function Lobby() {
         setIsLoading(false);
         return
       }
-      if(data.isLobbyFull) {
+      if(data.isLobbyFull && !canReconnect) {
         setErrMsg(`${data.lobbyName}'s game is full.`);
         setIsLoading(false);
         return
@@ -64,6 +65,7 @@ export default function Lobby() {
       setIsLoading(false);
       return;
     }
+
     setIsLoading(false);
 
     socketConnect(`ws://${location.hostname}:5000/api/join-game/${gameId}`, () => {
@@ -74,14 +76,14 @@ export default function Lobby() {
     // I mean, the json parser is parsing "true" as true. don't ask why
     socket.on("game-verified", (s:boolean) => {
       if(s)
-        socket.emit("join-player-info", { playerName, side });
+        socket.emit("join-player-info", { playerName, side, isReconnect: canReconnect, playerId: SessionStorage.playerId });
       else
         navigate("/")
     })
 
     socket.on("join-player-info-res", (data:{ playerId:string, side:Side, err:boolean, msg:string }) => {
       if(data.err) return setErrMsg(data.msg);
-      if(data.side === "black") setBlackSideName(playerName);
+      if(data.side === BLACK) setBlackSideName(playerName);
       else setWhiteSideName(playerName);
       SessionStorage.mySide = data.side;
       SessionStorage.playerId = data.playerId;
@@ -94,6 +96,10 @@ export default function Lobby() {
       setWhiteSideName(lobby.white);
       SessionStorage.playerNames = new PlayerNamesObj(lobby.black, lobby.white);
       SessionStorage.gameId = gameId;
+    })
+
+    socket.on("reconnect-success", () => {
+      navigate(`/game/${gameId}`);
     })
 
     socket.on("countdown-begin", () => {
