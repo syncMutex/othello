@@ -97,7 +97,22 @@
   }
 }
 
+.chat-icon-container, .close-btn, .minimize-btn{
+  display: none;
+}
+
 @media (max-width:850px) {
+  .chat-icon-container{
+    display: block;
+    position: fixed;
+    bottom: 1rem;
+    right: 2rem;
+    color: white;
+    width: 4rem;
+    height: 4rem;
+    cursor: pointer;
+  }
+
   .chat-section {
     width: 100%;
     border-top-left-radius: 1rem;
@@ -108,10 +123,45 @@
     bottom: -70%;
     z-index: 20;
 
-    > header .close-btn{
-      display: inline-block;
-    }
+    > header {
+      > div {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+      }
 
+      .close-btn, .minimize-btn{
+        margin-left: 1rem;
+        display: inline-block;
+        cursor: pointer;
+        width: 2rem;
+        height: 2rem;
+      }
+
+      .close-btn{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        width: 2rem;
+        height: 2rem;
+
+        &::before, &::after{
+          content: "";
+          position: absolute;
+          height: 0.3rem;
+          width: 100%;
+          border-radius: 1rem;
+          background-color: white;
+        }
+        &::before{
+          transform: rotate(45deg);
+        }
+        &::after{
+          transform: rotate(-45deg);
+        }
+      }
+    }
     &.closed{
       .chat-msgs{
         height: 0;
@@ -119,7 +169,7 @@
         transition: height 0.5s;
         > div:last-child{
           position: absolute;
-          height: 2rem;
+          height: 2.5rem;
           border: none;
 
           .msg{
@@ -160,6 +210,11 @@
       .chat-input-section{
         height: max-content;
       }
+    }
+
+    &.hide{
+      padding: 0;
+      height: 0;
     }
   }
 }

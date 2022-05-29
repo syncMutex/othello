@@ -162,7 +162,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
   useEffect(() => { setAvailableMovesIdxs(new Set()); isCurTurn && checkMoves() }, [isCurTurn])
 
   // random autoplay
-  useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
+  /* useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
     let a = [...availableMovesIdxs];
     let t = a[Math.floor(Math.random()*a.length)].split("-");
     let rIdx = +t[0], cellIdx = +t[1];
@@ -170,7 +170,7 @@ export default function BoardSection({ socket }:BoardSectionProps) {
       setIsCurTurn(false);
       socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
     }
-  }, 200) }, [availableMovesIdxs])
+  }, 200) }, [availableMovesIdxs]) */
 
   const playMove = (rIdx:number, cIdx:number, _mySide:Side):boolean => {
     if(!availableMovesIdxs.has(`${rIdx}-${cIdx}`) && mySide === _mySide) return false;
