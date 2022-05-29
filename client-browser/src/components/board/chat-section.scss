@@ -11,15 +11,35 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-  }
 
-  h1{
-    font-size: 2.2rem;
-    font-family: monospace;
-  }
+    .opponent-details{
+      display: flex;
+      flex-direction: row;
+      align-items: center;
 
-  .close-btn{
-    display: none;
+      h1{
+        font-size: 1.8rem;
+        font-family: monospace;
+        margin-left: 1rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      > div{
+        width: 2rem;
+        height: 2rem;
+        border-radius: 5rem;
+        box-shadow: 0 0 10px rgba(78, 78, 78, 0.3);
+
+        &.black{
+          background-color: black;
+        }
+
+        &.white{
+          background-color: white;
+        }
+      }
+    }
   }
 }
 
@@ -111,6 +131,7 @@
     width: 4rem;
     height: 4rem;
     cursor: pointer;
+    filter: drop-shadow(0 0 20px black);
   }
 
   .chat-section {
@@ -122,20 +143,36 @@
     left: 0;
     bottom: -70%;
     z-index: 20;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
 
     > header {
-      > div {
+      > * {
+        width: 50%;
+      }
+      > .opponent-details{
+        h1{
+          font-size: 1.5rem;
+        }
+        
+        > div{
+          min-width: 2rem;
+          min-height: 2rem;
+        }
+      }
+      > .icons{
+        width: max-content;
         display: flex;
         flex-direction: row;
         align-items: center;
+        justify-content: flex-end;
       }
 
       .close-btn, .minimize-btn{
         margin-left: 1rem;
         display: inline-block;
         cursor: pointer;
-        width: 2rem;
-        height: 2rem;
+        min-width: 2rem;
+        min-height: 2rem;
       }
 
       .close-btn{

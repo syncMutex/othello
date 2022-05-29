@@ -89,7 +89,13 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 			p.ReConnect(s)
 			g.ListenSocketEventsFor(p)
 			p.Emit("lobby-info", g.GetLobbyInfoJson())
-			p.Emit("reconnect-success", "")
+
+			isGameStarted := "false"
+			if g.IsGameStarted() {
+				isGameStarted = "true"
+			}
+
+			p.Emit("reconnect-success", isGameStarted)
 			return
 		}
 

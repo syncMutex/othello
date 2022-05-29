@@ -99,8 +99,10 @@ export default function Lobby() {
       SessionStorage.gameId = gameId;
     })
 
-    socket.on("reconnect-success", () => {
-      navigate(`/game/${gameId}`);
+    // I mean again, the json parser is parsing "true" as true. don't ask why
+    socket.on("reconnect-success", (isGameStarted:boolean) => {
+      if(isGameStarted) navigate(`/game/${gameId}`);
+      else setLobbyMsg("waiting for your opponent...");
     })
 
     socket.on("countdown-begin", () => {
