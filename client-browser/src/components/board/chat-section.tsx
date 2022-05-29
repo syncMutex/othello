@@ -1,12 +1,12 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { BLACK } from "../../ts/common.types";
-import { SessionStorage } from "../../ts/session-storage";
+import { WHITE, Side } from "../../ts/common.types";
 import { Socket } from "../../ts/socket-impl";
 import "./chat-section.scss";
  
 interface ChatSectionProps {
   socket: Socket;
-  opponentName: string;
+  opponent: { name:string; sideStr:string }
+  isOpponentOnline: boolean;
 }
 
 class ChatMsg {
@@ -25,7 +25,7 @@ class ChatMsg {
 
 type Chats = Array<ChatMsg>;
 
-export default function ChatSection({ socket, opponentName }:ChatSectionProps) {
+export default function ChatSection({ socket, isOpponentOnline, opponent }:ChatSectionProps) {
   const [isChatSectionOpen, setIsChatSectionOpen] = useState<boolean>(false);
   const [hideChatSection, setHideChatSection] = useState<boolean>(false);
   const [chats, setChats] = useState<Chats>([]);
@@ -42,7 +42,7 @@ export default function ChatSection({ socket, opponentName }:ChatSectionProps) {
 
   useEffect(() => {
     socket.on("chat-msg", (msg:string) => {
-      setChats((prev:Chats) => [...prev, new ChatMsg(opponentName, msg, false)]);
+      setChats((prev:Chats) => [...prev, new ChatMsg(opponent.name, msg, false)]);
     })
   }, [])
   
@@ -63,8 +63,8 @@ export default function ChatSection({ socket, opponentName }:ChatSectionProps) {
     </div>}
     <header>
       <div className="opponent-details">
-        <div className={`${SessionStorage.mySide === BLACK ? "white" : "black"}`}></div>
-        <h1>{opponentName}</h1>
+        <div className={`${opponent.sideStr}${isOpponentOnline ? " online" : ""}`.trim()}></div>
+        <h1>{opponent.name}</h1>
       </div>
       <div className="icons">
         <div className="minimize-btn" onClick={() => setIsChatSectionOpen((prev:boolean) => !prev)}>

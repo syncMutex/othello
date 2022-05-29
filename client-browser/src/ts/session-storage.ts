@@ -48,7 +48,6 @@ class SessionStorageHandler {
     return this._opponentName;
   }
   
-
   private set opponentName(v : SSValue) {
     this._opponentName = v;
     if(v === null) sessionStorage.removeItem("opponentName");

@@ -86,7 +86,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 				s.Close()
 				return
 			}
-			p.ReConnect(s)
+			p.Reconnect(s)
 			g.ListenSocketEventsFor(p)
 			p.Emit("lobby-info", g.GetLobbyInfoJson())
 
@@ -96,6 +96,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 			}
 
 			p.Emit("reconnect-success", isGameStarted)
+			g.GetOpponentOf(p.Side()).Emit("opponent-reconnect", "")
 			return
 		}
 
@@ -129,7 +130,8 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	})
 
 	fmt.Println(s.Listen().Error())
-	if p := g.GetPlayerById(playerId); p != nil {
+	p := g.GetPlayerById(playerId)
+	if p != nil {
 		p.Disconnect()
 	}
 
@@ -137,6 +139,9 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		game.GamesMap.DeleteGame(gameId)
 	} else if g.IsGameIdle() {
 		game.GamesMap.GameSelfDestructOnIdle(gameId, time.Second*10)
+	} else if p != nil {
+		g.GetOpponentOf(p.Side()).Emit("opponent-disconnect", "")
+		g.WaitForReconnect(time.Second*20, p)
 	}
 	s.Close()
 }

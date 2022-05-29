@@ -1,13 +1,17 @@
 package player
 
-import "othelloServer/socket"
+import (
+	"othelloServer/socket"
+	"time"
+)
 
 type playerStruct struct {
 	socket.Socket
-	name   string
-	id     string
-	isRsvd bool
-	side   rune
+	name          string
+	id            string
+	isRsvd        bool
+	side          rune
+	reconnectChan chan struct{}
 }
 
 type Player interface {
@@ -15,7 +19,7 @@ type Player interface {
 	On(evName string, f func([]byte))
 
 	Connect(socket.Socket, string)
-	ReConnect(socket.Socket)
+	Reconnect(socket.Socket)
 	Disconnect()
 	IsIdValid(string) bool
 	IsConnected() bool
@@ -24,11 +28,23 @@ type Player interface {
 	PlayerName() string
 	Side() rune
 	OpponentRune() rune
+	ReconnectChan() chan struct{}
+	WaitForReconnect(_ time.Duration, gameOverFunc func(string))
 }
 
 func NewPlayer(id string, side rune) Player {
 	var p Player = &playerStruct{id: id, side: side}
 	return p
+}
+
+func (p *playerStruct) Emit(evName string, data string) {
+	if p.Socket != nil {
+		p.Socket.Emit(evName, data)
+	}
+}
+
+func (p *playerStruct) ReconnectChan() chan struct{} {
+	return p.reconnectChan
 }
 
 func (p *playerStruct) PlayerName() string {
@@ -45,7 +61,21 @@ func (p *playerStruct) Connect(s socket.Socket, name string) {
 	p.name = name
 }
 
-func (p *playerStruct) ReConnect(s socket.Socket) {
+func (p *playerStruct) WaitForReconnect(d time.Duration, gameOverFunc func(string)) {
+	p.reconnectChan = make(chan struct{})
+	select {
+	case <-p.reconnectChan:
+		close(p.reconnectChan)
+		return
+	case <-time.After(d):
+		if gameOverFunc != nil {
+			gameOverFunc("opponent failed to reconnect :(")
+		}
+	}
+}
+
+func (p *playerStruct) Reconnect(s socket.Socket) {
+	p.reconnectChan <- struct{}{}
 	p.Socket = s
 }
 

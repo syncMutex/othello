@@ -8,6 +8,7 @@ import (
 	"log"
 	"othelloServer/game/player"
 	"othelloServer/socket"
+	"time"
 )
 
 type playerSide struct {
@@ -32,6 +33,8 @@ type Game interface {
 	openChan()
 	StopDestruct()
 
+	WaitForReconnect(time.Duration, player.Player)
+
 	StartGame()
 
 	JoinGame(name string, side rune, _ socket.Socket) (playerId string, _ error)
@@ -50,6 +53,7 @@ type Game interface {
 	GetPlayerById(string) player.Player
 	GetEmptySide() rune
 	GetLobbyInfoJson() string
+	GetOpponentOf(rune) *playerSide
 }
 
 func newPlayerSide(pId string, side rune) *playerSide {
@@ -105,7 +109,9 @@ func (g *gameStruct) initBoard() {
 	g.board[4][4] = BLACK
 }
 
-func (g *gameStruct) gameOver() {
+func (g *gameStruct) gameOver(msg string) {
+	g.Broadcast("game-over", msg)
+	g.Broadcast("opponent-disconnect", "")
 	g.gameState = GAME_OVER
 	g.blackSide.Disconnect()
 	g.whiteSide.Disconnect()
@@ -137,10 +143,10 @@ func (g *gameStruct) changeTurn() {
 }
 
 func (g *gameStruct) getCurOpponent() *playerSide {
-	return g.getOpponentOf(g.curTurnRune)
+	return g.GetOpponentOf(g.curTurnRune)
 }
 
-func (g *gameStruct) getOpponentOf(side rune) *playerSide {
+func (g *gameStruct) GetOpponentOf(side rune) *playerSide {
 	if side == BLACK {
 		return g.whiteSide
 	}
@@ -269,4 +275,8 @@ func (g *gameStruct) StopDestruct() {
 	if g.isDestructChanOpen {
 		g.stopDestructChan <- struct{}{}
 	}
+}
+
+func (g *gameStruct) WaitForReconnect(d time.Duration, p player.Player) {
+	go p.WaitForReconnect(d, g.gameOver)
 }

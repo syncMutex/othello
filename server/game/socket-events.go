@@ -13,11 +13,12 @@ type moveDetails struct {
 func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 	p.On("game-state", func(b []byte) {
 		res, _ := json.Marshal(struct {
-			Board       board `json:"board"`
-			CurTurn     rune  `json:"curTurn"`
-			BlackPoints int   `json:"blackPoints"`
-			WhitePoints int   `json:"whitePoints"`
-		}{g.board, g.curTurnRune, g.board.getPointsFor(BLACK), g.board.getPointsFor(WHITE)})
+			Board            board `json:"board"`
+			CurTurn          rune  `json:"curTurn"`
+			BlackPoints      int   `json:"blackPoints"`
+			WhitePoints      int   `json:"whitePoints"`
+			IsOpponentOnline bool  `json:"isOpponentOnline"`
+		}{g.board, g.curTurnRune, g.board.getPointsFor(BLACK), g.board.getPointsFor(WHITE), g.getCurOpponent().IsConnected()})
 
 		p.Emit("game-state-res", string(res))
 	})
@@ -27,12 +28,11 @@ func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 	})
 
 	p.On("chat-msg", func(b []byte) {
-		g.getOpponentOf(p.Side()).Emit("chat-msg", string(b))
+		g.GetOpponentOf(p.Side()).Emit("chat-msg", string(b))
 	})
 
 	p.On("resign-game", func(b []byte) {
-		g.getOpponentOf(p.Side()).Emit("opponent-resign", "")
-		g.gameOver()
+		g.gameOver("opponent resigned.")
 	})
 
 	p.On("move", func(b []byte) {
@@ -44,8 +44,7 @@ func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 				g.getCurOpponent().Emit("opponent-move", string(b))
 				g.calcHasPossibleMoves()
 				if g.isGameOver() {
-					g.Broadcast("game-over", "")
-					g.gameOver()
+					g.gameOver("")
 					return
 				}
 				g.changeTurn()

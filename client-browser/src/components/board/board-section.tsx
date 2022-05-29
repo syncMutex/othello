@@ -1,5 +1,5 @@
 import "./board-section.scss";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, SetStateAction, Dispatch } from "react";
 import { useForceUpdate } from "../../hooks/utils";
 import { Link } from "react-router-dom";
 import { Socket } from "../../ts/socket-impl";
@@ -31,9 +31,10 @@ type CellType = typeof BLACK| typeof WHITE| typeof EMPTY;
 
 interface BoardSectionProps {
   socket: Socket;
+  setIsOpponentOnline: Dispatch<SetStateAction<boolean>>;
 }
 
-export default function BoardSection({ socket }:BoardSectionProps) {
+export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectionProps) {
   const forceUpdate = useForceUpdate();
   const board = useRef<Board>([[]]);
   const setBoard = (newBoard:Board) => { board.current = newBoard; forceUpdate() };
@@ -53,30 +54,42 @@ export default function BoardSection({ socket }:BoardSectionProps) {
     let b:Board = [];
     for(let i = 0; i < 8; i++) b.push((new Array<number>(8)).fill(0, 0, 8));
     setBoard(b);
+
     socket.emit("game-state");
-    socket.on("game-state-res", (game:{board:Board, curTurn:number, blackPoints:number, whitePoints:number}) => {
+
+    socket.on("game-state-res", (game:{
+      board:Board, curTurn:number, blackPoints:number, whitePoints:number, isOpponentOnline:boolean
+    }) => {
       setBoard(game.board);
+      setIsOpponentOnline(game.isOpponentOnline);
       blackPoints.current = game.blackPoints;
       whitePoints.current = game.whitePoints;
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
+
     socket.on("cur-turn", () => {
       setIsCurTurn(true);
     })
-    socket.on("game-over", () => {
+
+    socket.on("opponent-disconnect", () => {
+      setIsOpponentOnline(false);
+    })
+
+    socket.on("opponent-reconnect", () => {
+      setIsOpponentOnline(true);
+    })
+
+    socket.on("game-over", (gameOverMsg:string) => {
       setIsGameOver(true);
-      if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
+      if(gameOverMsg) setGameOverMsg(gameOverMsg);
+      else if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
       else {
         if(mySide === BLACK) setGameOverMsg(whitePoints.current < blackPoints.current ? "You won :)" : "You lost :(");
         else setGameOverMsg(whitePoints.current > blackPoints.current ? "You won :)" : "You lost :(");
       }
       SessionStorage.reset();
     })
-    socket.on("opponent-resign", () => {
-      setIsGameOver(true);
-      setGameOverMsg("opponent resigned.");
-      SessionStorage.reset();
-    })
+
     socket.on("opponent-move", ({ rowIdx, colIdx }:{ rowIdx:number, colIdx:number }) => {
       playMove(rowIdx, colIdx, opponentSide);
     })

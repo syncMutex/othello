@@ -54,6 +54,7 @@ export default function Lobby() {
       if(data.err || !res.ok) {
         setErrMsg(data.msg);
         setIsLoading(false);
+        if(canReconnect) SessionStorage.reset();
         return
       }
       if(data.isLobbyFull && !canReconnect) {
