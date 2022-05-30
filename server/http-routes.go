@@ -141,7 +141,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		game.GamesMap.GameSelfDestructOnIdle(gameId, time.Second*10)
 	} else if p != nil {
 		g.GetOpponentOf(p.Side()).Emit("opponent-disconnect", "")
-		g.WaitForReconnect(time.Second*20, p)
+		g.CheckForReconnectWait(p)
 	}
 	s.Close()
 }

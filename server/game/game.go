@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const RECONN_DUR = time.Second * 20
+
 type playerSide struct {
 	player.Player
 	hasPossibleMoves bool
@@ -33,7 +35,7 @@ type Game interface {
 	openChan()
 	StopDestruct()
 
-	WaitForReconnect(time.Duration, player.Player)
+	CheckForReconnectWait(player.Player)
 
 	StartGame()
 
@@ -277,6 +279,13 @@ func (g *gameStruct) StopDestruct() {
 	}
 }
 
-func (g *gameStruct) WaitForReconnect(d time.Duration, p player.Player) {
+func (g *gameStruct) waitForReconnect(d time.Duration, p player.Player) {
 	go p.WaitForReconnect(d, g.gameOver)
+}
+
+func (g *gameStruct) CheckForReconnectWait(p player.Player) {
+	if !p.IsConnected() && p.Side() == g.curTurnRune {
+		g.GetOpponentOf(p.Side()).Emit("wait-for-opponent-reconnect", "")
+		g.waitForReconnect(RECONN_DUR, p)
+	}
 }

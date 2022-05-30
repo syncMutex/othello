@@ -1,5 +1,5 @@
 import "./board-section.scss";
-import { useState, useRef, useEffect, SetStateAction, Dispatch } from "react";
+import { useState, useRef, useEffect, SetStateAction, Dispatch, Ref, MutableRefObject, useCallback } from "react";
 import { useForceUpdate } from "../../hooks/utils";
 import { Link } from "react-router-dom";
 import { Socket } from "../../ts/socket-impl";
@@ -34,6 +34,44 @@ interface BoardSectionProps {
   setIsOpponentOnline: Dispatch<SetStateAction<boolean>>;
 }
 
+interface ReconnectHandlerProps {
+  socket: Socket;
+  setIsOpponentOnline: Dispatch<SetStateAction<boolean>>
+  reconnectInterval: MutableRefObject<number|undefined>
+}
+
+function ConnectionHandler({ socket, setIsOpponentOnline, reconnectInterval }:ReconnectHandlerProps) {
+  const [reconnectTimer, setReconnectTimer] = useState<number>(-1);
+
+  useEffect(() => {
+    socket.on("wait-for-opponent-reconnect", () => {
+      setReconnectTimer(20);
+      reconnectInterval.current = setInterval(() => {
+        setReconnectTimer((prev:number) => {
+          if(prev === 0) clearInterval(reconnectInterval.current);
+          return prev - 1;
+        });
+      }, 1000)
+    })
+
+    socket.on("opponent-disconnect", () => {
+      setIsOpponentOnline(false);
+    })
+
+    socket.on("opponent-reconnect", () => {
+      setIsOpponentOnline(true);
+      setReconnectTimer(() => {
+        clearInterval(reconnectInterval.current);
+        return -1;
+      });
+    })
+  }, [])
+
+  return (<>
+    {reconnectTimer !== -1 && <div className="reconnect-msg">waiting for opponent reconnection {reconnectTimer}</div>}
+  </>)
+}
+
 export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectionProps) {
   const forceUpdate = useForceUpdate();
   const board = useRef<Board>([[]]);
@@ -46,6 +84,7 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
   const blackPoints = useRef<number>(0);
   const whitePoints = useRef<number>(0);
   const [gameOverMsg, setGameOverMsg] = useState<string>("");
+  const reconnectInterval = useRef<number|undefined>();
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -71,16 +110,9 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
       setIsCurTurn(true);
     })
 
-    socket.on("opponent-disconnect", () => {
-      setIsOpponentOnline(false);
-    })
-
-    socket.on("opponent-reconnect", () => {
-      setIsOpponentOnline(true);
-    })
-
     socket.on("game-over", (gameOverMsg:string) => {
       setIsGameOver(true);
+      clearInterval(reconnectInterval.current);
       if(gameOverMsg) setGameOverMsg(gameOverMsg);
       else if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
       else {
@@ -203,7 +235,16 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     setBoard(prev);
     return hasFlipped;
   } 
+
+  const moveClick = (rowIdx:number, colIdx:number) => {
+    if(playMove(rowIdx, colIdx, mySide)) {
+      setIsCurTurn(false);
+      socket.emit("move", { rowIdx, colIdx })
+    }
+  }
+
   return (<div className="board-section">
+    <ConnectionHandler socket={socket} setIsOpponentOnline={setIsOpponentOnline} reconnectInterval={reconnectInterval} />
     {!isGameOver && <div className="cur-turn">
       {isCurTurn ? "Your turn" : (opponentSide === BLACK ? "Black" : "White") + "'s turn"}
     </div>}
@@ -222,12 +263,7 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
           <div key={rIdx} className="row">
             {row.map((rune:number, cellIdx:number) => (
               <div
-                onClick={() => {
-                  if(playMove(rIdx, cellIdx, mySide)) {
-                    setIsCurTurn(false);
-                    socket.emit("move", { rowIdx: rIdx , colIdx: cellIdx })
-                  }
-                }}
+                onClick={() => moveClick(rIdx, cellIdx)}
                 key={cellIdx}
                 className={`color-${rune}${availableMovesIdxs.has(`${rIdx}-${cellIdx}`) ? " available" : ""}`}
               >

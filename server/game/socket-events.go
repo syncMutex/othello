@@ -51,7 +51,9 @@ func (g *gameStruct) ListenSocketEventsFor(p player.Player) {
 				if !g.curPlayer().hasPossibleMoves {
 					g.changeTurn()
 				}
-				g.curPlayer().Emit("cur-turn", "")
+				cp := g.curPlayer()
+				g.CheckForReconnectWait(cp)
+				cp.Emit("cur-turn", "")
 			}
 		}
 	})
