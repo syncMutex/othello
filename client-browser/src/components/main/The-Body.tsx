@@ -7,6 +7,7 @@ import Game from "../../views/game"
 import ChangeName from "../../views/change-name"
 import Lobby from "../../views/lobby"
 import CheckReconnection from "../reconnect"
+import SinglePlayer from "../../views/single-player"
 
 export default function TheBody() {
   const loc = useLocation();
@@ -22,6 +23,7 @@ export default function TheBody() {
         <Route path="/join-game/:gameId" element={<CheckReconnection><JoinGame /></CheckReconnection>} />
         <Route path="/lobby/:gameId" element={<CheckReconnection><Lobby /></CheckReconnection>} />
         <Route path="/change-username" element={<ChangeName />} />
+        <Route path="/single-player" element={<CheckReconnection><SinglePlayer /></CheckReconnection>} />
         <Route path="/game/:gameId" element={<Game />} />
         <Route path="*" element={<Navigate to="/" replace />}/>
       </Routes>

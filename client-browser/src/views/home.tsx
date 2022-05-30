@@ -11,9 +11,6 @@ export default function Home() {
       <Link className="link" to="/create-game">
         Create game
       </Link>
-      <Link className="link" to="/join-game">
-        Join game
-      </Link>
       <Link className="link" to="/change-username">
         Change name
       </Link>

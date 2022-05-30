@@ -32,6 +32,7 @@ type CellType = typeof BLACK| typeof WHITE| typeof EMPTY;
 interface BoardSectionProps {
   socket: Socket;
   setIsOpponentOnline: Dispatch<SetStateAction<boolean>>;
+  isVsComputer?: boolean;
 }
 
 interface ReconnectHandlerProps {
@@ -72,13 +73,13 @@ function ConnectionHandler({ socket, setIsOpponentOnline, reconnectInterval }:Re
   </>)
 }
 
-export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectionProps) {
+export default function BoardSection({ socket, setIsOpponentOnline, isVsComputer }:BoardSectionProps) {
   const forceUpdate = useForceUpdate();
   const board = useRef<Board>([[]]);
   const setBoard = (newBoard:Board) => { board.current = newBoard; forceUpdate() };
   const [isCurTurn, setIsCurTurn] = useState<boolean>(false);
-  const mySide = SessionStorage.mySide;
-  const opponentSide = (mySide === BLACK) ? WHITE : BLACK;
+  let mySide = SessionStorage.mySide;
+  let opponentSide = calcOpponent(mySide);
   const [availableMovesIdxs, setAvailableMovesIdxs] = useState<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
   const blackPoints = useRef<number>(0);
@@ -86,13 +87,50 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
   const [gameOverMsg, setGameOverMsg] = useState<string>("");
   const reconnectInterval = useRef<number|undefined>();
 
+  function calcOpponent(s:Side):Side {
+    return (s === BLACK) ? WHITE : BLACK;
+  }
+
+  const pointSetter = (b:number, w:number) => {
+    blackPoints.current = b;
+    whitePoints.current = w;
+  }
+
+  const gameOver = (gameOverMsg:string) => {
+    setIsGameOver(true);
+    if(gameOverMsg) setGameOverMsg(gameOverMsg);
+    else if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
+    else {
+      if(mySide === BLACK) setGameOverMsg(whitePoints.current < blackPoints.current ? "You won :)" : "You lost :(");
+      else setGameOverMsg(whitePoints.current > blackPoints.current ? "You won :)" : "You lost :(");
+    }
+    SessionStorage.reset();
+  }
+
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--ghost-color", (mySide === BLACK) ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)"
     );
     let b:Board = [];
     for(let i = 0; i < 8; i++) b.push((new Array<number>(8)).fill(0, 0, 8));
+    if(isVsComputer) {
+      b[3][3] = BLACK;
+      b[3][4] = WHITE;
+      b[4][3] = WHITE;
+      b[4][4] = BLACK;
+      pointSetter(2, 2);
+      if(!SessionStorage.mySide) {
+        mySide = BLACK;
+        document.documentElement.style.setProperty(
+          "--ghost-color", (mySide === BLACK) ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)"
+        );
+        SessionStorage.mySide = BLACK;
+      }
+      if(mySide === BLACK) setIsCurTurn(true);
+    }
     setBoard(b);
+
+    if(isVsComputer) return;
 
     socket.emit("game-state");
 
@@ -101,8 +139,7 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     }) => {
       setBoard(game.board);
       setIsOpponentOnline(game.isOpponentOnline);
-      blackPoints.current = game.blackPoints;
-      whitePoints.current = game.whitePoints;
+      pointSetter(game.blackPoints, game.whitePoints);
       if(mySide === game.curTurn) setIsCurTurn(true);
     })
 
@@ -111,15 +148,8 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     })
 
     socket.on("game-over", (gameOverMsg:string) => {
-      setIsGameOver(true);
       clearInterval(reconnectInterval.current);
-      if(gameOverMsg) setGameOverMsg(gameOverMsg);
-      else if(whitePoints.current === blackPoints.current) setGameOverMsg("Draw");
-      else {
-        if(mySide === BLACK) setGameOverMsg(whitePoints.current < blackPoints.current ? "You won :)" : "You lost :(");
-        else setGameOverMsg(whitePoints.current > blackPoints.current ? "You won :)" : "You lost :(");
-      }
-      SessionStorage.reset();
+      gameOver(gameOverMsg);
     })
 
     socket.on("opponent-move", ({ rowIdx, colIdx }:{ rowIdx:number, colIdx:number }) => {
@@ -149,7 +179,7 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     }
 
     if(b[row][col] === mySide && (col !== initCol + hDir || row !== initRow + vDir)) {
-      if(funcOrBoard === null) return [false, 0];
+      if(funcOrBoard === null) return [true, 0];
       if(typeof funcOrBoard === "function") funcOrBoard(row, col);
       else return [true, flipFrom(funcOrBoard, initRow, initCol, vDir, hDir, mySide as Side, opponentSide)];
     }
@@ -174,15 +204,16 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     return flipped;
   }
 
-  const traverseAll = (i:number, j:number, ct:CellType, funcOrBoard:EndPosCallback|Board):[boolean,number] => {
-    let opponentSide:Side;
-    if(ct === EMPTY) opponentSide = mySide === BLACK ? WHITE : BLACK;
-    else opponentSide = ct === BLACK ? WHITE : BLACK;
+  const traverseAll = (
+    i:number, j:number,
+    mySide:CellType, opponentSide:Side,
+    funcOrBoard:EndPosCallback|Board
+  ):[boolean,number] => {
     let hasFlipped:boolean=false, isF:boolean;
     let flippedCount:number = 0, flC:number;
     for(let [vertic, horiz] of TRAV_ARR) {
       [isF, flC] = traverseFrom(
-        i, j, vertic as Dir, horiz as Dir, ct, opponentSide, funcOrBoard
+        i, j, vertic as Dir, horiz as Dir, mySide, opponentSide, funcOrBoard
       );
       flippedCount += flC;
       hasFlipped = isF || hasFlipped;
@@ -190,23 +221,54 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     return [hasFlipped, flippedCount];
   }
 
-  const checkMoves = () => {
+  const hasPossibleMoves = (s:Side):boolean => {
+    let isAvailableMove = false;
+    const opponentSide = calcOpponent(s)
+    for(let i = 0; i < board.current.length; i++) {
+      for(let j = 0; j < board.current[i].length; j++) {
+        if(board.current[i][j] !== s) continue;
+        for(let [vertic, horiz] of TRAV_ARR) {
+          isAvailableMove = traverseFrom(
+            i, j, vertic as Dir, horiz as Dir, EMPTY, opponentSide, null
+          )[0];
+          if(isAvailableMove) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  const checkMoves = (s:Side=mySide):undefined|Set<string> => {
     const newMoves:Set<string> = new Set();
     const addFunc = (rIdx:number, cIdx:number) => newMoves.add(`${rIdx}-${cIdx}`);
+    const opponentSide = calcOpponent(s);
 
     for(let i = 0; i < board.current.length; i++) {
       for(let j = 0; j < board.current[i].length; j++) {
-        let cell = board.current[i][j];
-        if(cell !== mySide) continue;
-        traverseAll(i, j, EMPTY, addFunc);
+        if(board.current[i][j] !== s) continue;
+        traverseAll(i, j, EMPTY, opponentSide, addFunc);
       }
     }
-    setAvailableMovesIdxs(newMoves);
+    if(s === mySide)
+      setAvailableMovesIdxs(newMoves);
+    else return newMoves;
   }
 
   useEffect(() => { setAvailableMovesIdxs(new Set()); isCurTurn && checkMoves() }, [isCurTurn])
 
-  // random autoplay
+  const playComputer = () => {
+    const availableMovesStrs = checkMoves(opponentSide) as Set<string>;
+    if(availableMovesStrs.size > 0) {
+      let a = [...availableMovesStrs];
+      let t = a[Math.floor(Math.random()*a.length)].split("-");
+      let rIdx = +t[0], cellIdx = +t[1];
+      playMove(rIdx, cellIdx, opponentSide)
+    }
+    setIsCurTurn(true);
+  }
+
+  // random autoplay online
+
   /* useEffect(() => { isCurTurn && availableMovesIdxs.size && setTimeout(() => {
     let a = [...availableMovesIdxs];
     let t = a[Math.floor(Math.random()*a.length)].split("-");
@@ -221,25 +283,28 @@ export default function BoardSection({ socket, setIsOpponentOnline }:BoardSectio
     if(!availableMovesIdxs.has(`${rIdx}-${cIdx}`) && mySide === _mySide) return false;
     let prev:Board = board.current.map((r:Array<number>) => [...r]);
     prev[rIdx][cIdx] = _mySide;
-    const [hasFlipped, flipCount] = traverseAll(rIdx, cIdx, _mySide, prev);
+    const _opponentSide = calcOpponent(_mySide);
+    const [hasFlipped, flipCount] = traverseAll(rIdx, cIdx, _mySide, _opponentSide, prev);
     if(!hasFlipped) prev[rIdx][cIdx] = EMPTY;
     if(flipCount) {
-      if(_mySide === BLACK) {
-        blackPoints.current += 1 + flipCount;
-        whitePoints.current -= flipCount;
-      } else {
-        whitePoints.current += 1 + flipCount;
-        blackPoints.current -= flipCount;
-      }
+      if(_mySide === BLACK)
+        pointSetter(blackPoints.current + 1 + flipCount, whitePoints.current - flipCount);
+      else
+        pointSetter(blackPoints.current - flipCount, whitePoints.current + 1 + flipCount);
     }
     setBoard(prev);
+    if(isVsComputer && (!hasPossibleMoves(mySide) && !hasPossibleMoves(opponentSide))) gameOver("");
     return hasFlipped;
   } 
 
   const moveClick = (rowIdx:number, colIdx:number) => {
     if(playMove(rowIdx, colIdx, mySide)) {
       setIsCurTurn(false);
-      socket.emit("move", { rowIdx, colIdx })
+      if(isVsComputer) {
+        setTimeout(() => {
+          playComputer();
+        }, 1000);
+      } else socket.emit("move", { rowIdx, colIdx });
     }
   }
 
