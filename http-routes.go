@@ -2,15 +2,17 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"othelloServer/game"
 	"othelloServer/respond"
 	"othelloServer/socket"
+	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -129,7 +131,8 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 
-	fmt.Println(s.Listen().Error())
+	s.Listen()
+
 	p := g.GetPlayerById(playerId)
 	if p != nil {
 		p.Disconnect()
@@ -138,7 +141,7 @@ func joinGame(w http.ResponseWriter, r *http.Request) {
 	if g.IsGameOver() {
 		game.GamesMap.DeleteGame(gameId)
 	} else if g.IsGameIdle() {
-		game.GamesMap.GameSelfDestructOnIdle(gameId, time.Second*10)
+		game.GamesMap.GameSelfDestructOnIdle(gameId, game.RECONN_DUR)
 	} else if p != nil {
 		g.GetOpponentOf(p.Side()).Emit("opponent-disconnect", "")
 		g.CheckForReconnectWait(p)
@@ -167,16 +170,52 @@ func gameInfo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func Handle404(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/html")
+	http.ServeFile(w, r, "./dist/index.html")
+}
+
 func createHttpRoutes() http.Handler {
-	headersOk := handlers.AllowedHeaders([]string{"Content-Type"})
-	originsOk := handlers.AllowedOrigins([]string{"*"})
-	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 	mainRouter := mux.NewRouter()
+
+	mainRouter.NotFoundHandler = http.HandlerFunc(Handle404)
+
+	contentTypeMap := map[string]string{
+		".html": "text/html",
+		".css":  "text/css",
+		".js":   "application/javascript",
+	}
+
+	filepath.Walk("./dist", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+		if info.IsDir() {
+			return err
+		}
+
+		dirPath := filepath.ToSlash(filepath.Dir(path))
+		contentType := contentTypeMap[filepath.Ext(info.Name())]
+		handlePath := "/" + strings.Join(strings.Split(dirPath, "/")[1:], "/")
+
+		if handlePath != "/" {
+			handlePath += "/" + info.Name()
+		}
+
+		hf := func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Content-Type", contentType)
+			http.ServeFile(w, r, path)
+		}
+
+		mainRouter.HandleFunc(handlePath, hf)
+		return nil
+	})
 
 	r := mainRouter.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/create-lobby", createLobby).Methods(http.MethodPost)
 	r.HandleFunc("/join-game/{gameId}", joinGame)
-	r.HandleFunc("/game-info/{gameId}", gameInfo)
+	r.HandleFunc("/game-info/{gameId}", gameInfo).Methods(http.MethodGet)
 	r.HandleFunc("/reconnect-game/{gameId}", joinGame)
-	return handlers.CORS(headersOk, originsOk, methodsOk)(mainRouter)
+
+	return mainRouter
 }
